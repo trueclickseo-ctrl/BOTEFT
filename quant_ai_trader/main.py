@@ -32,7 +32,7 @@ def main() -> None:
     symbols = args.symbols or settings.etf_universe
     for symbol in symbols:
         latest = repository.latest_bar_date(symbol) if args.incremental else None
-        start = (latest + pd.Timedelta(days=1)).strftime("%Y-%m-%d") if latest else args.start
+        start = (pd.Timestamp(latest).normalize() + pd.DateOffset(days=1)).strftime("%Y-%m-%d") if latest else args.start
         if pd.Timestamp(start) >= pd.Timestamp(args.end):
             print(f"{symbol}: already up to date")
             continue
