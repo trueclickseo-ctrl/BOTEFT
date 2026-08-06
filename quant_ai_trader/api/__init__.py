@@ -1,0 +1,1 @@
+"""FastAPI research service."""
