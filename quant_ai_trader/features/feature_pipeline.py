@@ -29,10 +29,12 @@ def clean_feature_dataset(frame: pd.DataFrame, zscore_threshold: float = 8.0) ->
     numeric = cleaned.select_dtypes(include=[np.number]).columns
     for column in numeric:
         series = cleaned[column]
-        median, mad = series.median(), (series - series.median()).abs().median()
-        if pd.notna(mad) and mad > 0:
-            robust_z = 0.6745 * (series - median) / mad
-            cleaned[column] = series.mask(robust_z.abs() > zscore_threshold)
+        # Both location and dispersion are shifted by one row: future samples never
+        # influence the decision to mask the current observation.
+        median = series.rolling(60, min_periods=20).median().shift(1)
+        mad = (series - median).abs().rolling(60, min_periods=20).median().shift(1)
+        robust_z = 0.6745 * (series - median) / mad.replace(0, np.nan)
+        cleaned[column] = series.mask(robust_z.abs() > zscore_threshold)
     # Forward-fill uses historical values only; never back-fill initial observations.
     return cleaned.ffill().replace([np.inf, -np.inf], np.nan)
 

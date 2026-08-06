@@ -81,7 +81,7 @@ The full rationale and experiment template are maintained in `STRATEGY_RESEARCH.
 ## Safety controls
 
 - No look-ahead fills; signal entries execute next open in the daily backtester.
-- Data checks reject invalid OHLCV, duplicate timestamps, and invalid price ranges.
+- Data checks reject invalid OHLCV, duplicate timestamps, and invalid price ranges; outlier filtering uses rolling past-only statistics.
 - Portfolio limits: 1% risk/trade, 10 positions, 10% per ETF, 30% per sector.
 - `runtime/KILL_SWITCH` blocks all broker submissions immediately.
 - Live submission requires code-level enablement plus `SAXO_ALLOW_LIVE_TRADING=true`.

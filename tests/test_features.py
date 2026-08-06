@@ -21,3 +21,11 @@ def test_cleaning_does_not_backfill_initial_missing_values(sample_bars):
     cleaned = clean_feature_dataset(sample_bars)
     # Invalid price rows are discarded rather than populated with a future price.
     assert sample_bars.index[0] not in cleaned.index
+
+
+def test_cleaning_is_not_affected_by_future_outlier(sample_bars):
+    baseline = clean_feature_dataset(sample_bars)
+    altered = sample_bars.copy()
+    altered.iloc[-1, altered.columns.get_loc("volume")] = 1_000_000_000
+    cleaned = clean_feature_dataset(altered)
+    assert cleaned.iloc[100]["volume"] == baseline.iloc[100]["volume"]
