@@ -113,3 +113,13 @@ The API provides `GET /health`, `/rankings`, `/backtests/{symbol}`, and `/portfo
 ## Sprint 6: execution, logs, and strategy leaderboard
 
 Saxo orders use the v2 pre-check endpoint before the order endpoint. Live submission is disabled by default; use `PaperBroker` until reconciliation and account-specific safeguards are approved. `configure_logging()` writes rotating JSONL audit logs to `logs/` without secrets. Persist completed backtests with `MarketDataRepository.record_strategy_run(...)`; `strategy_leaderboard()` ranks strategies by average Sharpe, then average total return.
+
+## Container deployment
+
+Copy `.env.example` to `.env`, add only a simulation token and verified instrument mappings, then run:
+
+```powershell
+docker compose up --build
+```
+
+The API is available at `http://localhost:8000` and the dashboard at `http://localhost:8501`. Data, models, and logs are mounted to local directories and never baked into the image. GitHub Actions runs the complete test suite on Python 3.12 for every push and pull request.
