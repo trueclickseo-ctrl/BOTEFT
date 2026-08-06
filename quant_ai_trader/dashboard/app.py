@@ -9,6 +9,7 @@ from quant_ai_trader.dashboard.data_service import build_rankings, run_model_bac
 from quant_ai_trader.data.database import MarketDataRepository
 from quant_ai_trader.models.model_manager import ModelManager
 from quant_ai_trader.risk.portfolio_manager import PortfolioManager
+from quant_ai_trader.operations.readiness import assess_readiness
 
 
 def main() -> None:
@@ -19,6 +20,9 @@ def main() -> None:
     repository = MarketDataRepository(settings.database_path)
     repository.initialize()
     manager = ModelManager(settings.model_directory)
+    readiness = assess_readiness(repository, manager)
+    st.sidebar.success("Paper ready" if readiness.ready_for_paper else "Paper trading not ready")
+    st.sidebar.json(readiness.checks)
     st.sidebar.header("Research data")
     st.sidebar.write(f"Database: `{settings.database_path}`")
     st.sidebar.write(f"Model directory: `{settings.model_directory}`")

@@ -147,3 +147,7 @@ Saxo submission is disabled in code by default. Even when enabled, a `runtime/KI
 ## Drift monitoring
 
 Each trained model stores mean and standard-deviation statistics for its input features. `detect_feature_drift` flags features whose current mean differs from the training distribution by three or more standard deviations. Treat drift as a research-review trigger before trusting new predictions.
+
+## Operational readiness
+
+`GET /readiness` and the dashboard sidebar summarize whether market data exists, a quality-approved model is available, and the kill switch is inactive. The application can report paper readiness, but it never declares itself live-ready: live deployment remains an explicit operator, compliance, and broker-reconciliation decision.

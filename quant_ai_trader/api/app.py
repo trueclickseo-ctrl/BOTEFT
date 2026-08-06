@@ -11,6 +11,7 @@ from quant_ai_trader.dashboard.data_service import build_rankings, run_model_bac
 from quant_ai_trader.data.database import MarketDataRepository
 from quant_ai_trader.models.model_manager import ModelManager
 from quant_ai_trader.risk.portfolio_manager import PortfolioManager
+from quant_ai_trader.operations.readiness import assess_readiness
 
 
 def create_app() -> FastAPI:
@@ -51,6 +52,10 @@ def create_app() -> FastAPI:
     @app.get("/leaderboard")
     def leaderboard() -> list[dict[str, object]]:
         return json.loads(repository.strategy_leaderboard().to_json(orient="records"))
+
+    @app.get("/readiness")
+    def readiness() -> dict[str, object]:
+        return vars(assess_readiness(repository, manager))
 
     return app
 
