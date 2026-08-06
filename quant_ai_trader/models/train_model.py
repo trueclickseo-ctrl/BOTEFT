@@ -45,12 +45,16 @@ def train_target_stop_model(
 
     x = eligible[columns]
     y = eligible[label].astype(int)
+    date_index = eligible.index.get_level_values(0) if isinstance(eligible.index, pd.MultiIndex) else eligible.index
+    unique_dates = pd.Index(date_index.unique()).sort_values()
     splitter = TimeSeriesSplit(n_splits=n_splits, gap=holding_period_days)
     oos = pd.Series(np.nan, index=eligible.index, name="target_hit_probability")
-    for train_indices, validation_indices in splitter.split(x):
+    for train_indices, validation_indices in splitter.split(unique_dates):
+        train_dates, validation_dates = unique_dates[train_indices], unique_dates[validation_indices]
+        train_mask, validation_mask = date_index.isin(train_dates), date_index.isin(validation_dates)
         model = _make_model()
-        model.fit(x.iloc[train_indices], y.iloc[train_indices])
-        oos.iloc[validation_indices] = model.predict_proba(x.iloc[validation_indices])[:, 1]
+        model.fit(x.loc[train_mask], y.loc[train_mask])
+        oos.loc[validation_mask] = model.predict_proba(x.loc[validation_mask])[:, 1]
 
     observed = oos.notna()
     if y.loc[observed].nunique() < 2:

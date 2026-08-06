@@ -134,6 +134,14 @@ After syncing sufficient Saxo history for `SPY` and an ETF, run:
 
 This creates a labelled dataset, runs purged walk-forward training, saves the model artifact, backtests the AI strategy and a transparent momentum baseline, writes an audit log, and records both results in the SQLite strategy leaderboard. The API endpoint `GET /leaderboard` and dashboard rank strategies by average Sharpe then total return.
 
+For pooled multi-ETF research after each symbol has been synced:
+
+```powershell
+.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.research --symbol QQQ IWM XLK XLF
+```
+
+The walk-forward split groups by trading date, so a given date cannot appear in both training and validation across different ETFs.
+
 Models are only promoted when their walk-forward validation satisfies the quality gate: at least 100 out-of-sample observations, ROC-AUC of 0.52 or higher, and average precision of 0.05 or higher. Rejected models are logged but are not saved or exposed as trading signals.
 
 Before research begins, daily OHLCV data is checked for missing fields, duplicate or unordered timestamps, invalid price ranges, non-positive prices, and negative volume. Large calendar gaps and unadjusted-close history are surfaced as warnings; malformed data blocks training.
