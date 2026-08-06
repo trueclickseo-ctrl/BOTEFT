@@ -2,6 +2,7 @@ import pandas as pd
 
 from quant_ai_trader.backtesting.backtester import BacktestConfig, ETFBacktester
 from quant_ai_trader.strategies.etf_strategy import StrategyRules, generate_signals
+from quant_ai_trader.strategies.baselines import momentum_baseline_signals
 
 
 def test_signals_require_probability_risk_reward_and_bull_market():
@@ -23,3 +24,8 @@ def test_backtester_fills_next_open_and_records_target_exit():
     assert result.trades.iloc[0]["entry_time"] == index[1]
     assert result.trades.iloc[0]["exit_reason"] == "profit_target"
     assert result.metrics["number_of_trades"] == 1
+
+def test_momentum_baseline_generates_regime_filtered_signals():
+    features = pd.DataFrame({"momentum_20": [.1, -.1], "spy_trend_50": [.01, .01]})
+    signals = momentum_baseline_signals(features)
+    assert signals["entry_signal"].tolist() == [True, False]

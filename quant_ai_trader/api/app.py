@@ -48,6 +48,10 @@ def create_app() -> FastAPI:
         state = app.state.portfolio
         return {"cash": state.cash, "equity": state.equity, "positions": [vars(p) | {"market_value": p.market_value} for p in state.positions.values()]}
 
+    @app.get("/leaderboard")
+    def leaderboard() -> list[dict[str, object]]:
+        return json.loads(repository.strategy_leaderboard().to_json(orient="records"))
+
     return app
 
 

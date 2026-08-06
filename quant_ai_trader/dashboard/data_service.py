@@ -10,6 +10,7 @@ from quant_ai_trader.features.feature_pipeline import build_feature_dataset
 from quant_ai_trader.models.model_manager import ModelArtifact
 from quant_ai_trader.models.predict import predict_opportunity, predict_probabilities
 from quant_ai_trader.strategies.etf_strategy import StrategyRules, generate_signals
+from quant_ai_trader.strategies.baselines import momentum_baseline_signals
 
 
 def build_rankings(repository: MarketDataRepository, artifact: ModelArtifact) -> pd.DataFrame:
@@ -46,3 +47,9 @@ def run_model_backtest(repository: MarketDataRepository, artifact: ModelArtifact
     rules = StrategyRules(target_return=artifact.target_return, stop_loss=artifact.stop_loss, maximum_holding_days=artifact.holding_period_days)
     signals = generate_signals(features, rules)
     return ETFBacktester(rules).run(bars, signals)
+
+def run_momentum_backtest(repository: MarketDataRepository, symbol: str) -> BacktestResult:
+    bars, spy = repository.load_bars(symbol), repository.load_bars("SPY")
+    if bars.empty or spy.empty: raise ValueError(f"Missing bars for {symbol} or SPY market context")
+    features = build_feature_dataset(bars, spy_bars=spy)
+    return ETFBacktester().run(bars, momentum_baseline_signals(features))

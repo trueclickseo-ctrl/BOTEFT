@@ -47,6 +47,10 @@ def main() -> None:
             st.line_chart(result.equity_curve)
             st.dataframe(result.trades, use_container_width=True, hide_index=True)
     _render_portfolio()
+    st.header("Strategy leaderboard")
+    leaderboard = repository.strategy_leaderboard()
+    if leaderboard.empty: st.caption("Run a research cycle to populate comparable strategy results.")
+    else: st.dataframe(leaderboard, use_container_width=True, hide_index=True)
 
 
 def _render_portfolio() -> None:
