@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import pandas as pd
 
 from quant_ai_trader.config.settings import SaxoSettings, Settings
 from quant_ai_trader.data.database import MarketDataRepository
@@ -16,6 +17,7 @@ def main() -> None:
     parser.add_argument("--end", required=True, help="Exclusive end date (YYYY-MM-DD)")
     parser.add_argument("--symbols", nargs="+", help="Symbols to sync; defaults to ETF universe")
     parser.add_argument("--provider", choices=("saxo", "yahoo"), default="saxo", help="Market-data source (default: saxo)")
+    parser.add_argument("--incremental", action="store_true", help="Fetch only bars after the latest stored date")
     args = parser.parse_args()
 
     settings = Settings()
@@ -29,7 +31,12 @@ def main() -> None:
         provider = YahooFinanceProvider()
     symbols = args.symbols or settings.etf_universe
     for symbol in symbols:
-        count = sync_symbol(provider, repository, symbol, args.start, args.end)
+        latest = repository.latest_bar_date(symbol) if args.incremental else None
+        start = (latest + pd.Timedelta(days=1)).strftime("%Y-%m-%d") if latest else args.start
+        if pd.Timestamp(start) >= pd.Timestamp(args.end):
+            print(f"{symbol}: already up to date")
+            continue
+        count = sync_symbol(provider, repository, symbol, start, args.end)
         print(f"{symbol}: persisted {count} daily bars")
 
     # SPY is reused as market context for an example feature build.

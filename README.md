@@ -55,6 +55,9 @@ $env:SAXO_INSTRUMENTS_JSON = '{"SPY":{"uic":36590,"asset_type":"Etf"},"QQQ":{"ui
 # Sync data. End date is exclusive.
 .\.venv\Scripts\python.exe -m quant_ai_trader.main --start 2021-08-01 --end 2026-08-08 --symbols SPY QQQ IWM XLK XLF
 
+# Daily incremental refresh after the initial history load.
+.\.venv\Scripts\python.exe -m quant_ai_trader.main --incremental --start 2021-08-01 --end 2026-08-08 --symbols SPY QQQ IWM XLK XLF
+
 # Train/evaluate a single ETF model.
 .\.venv\Scripts\python.exe -m quant_ai_trader.workflows.research --symbol QQQ
 

@@ -89,6 +89,11 @@ class MarketDataRepository:
             rows = connection.execute("SELECT DISTINCT symbol FROM daily_bars ORDER BY symbol").fetchall()
         return [row[0] for row in rows]
 
+    def latest_bar_date(self, symbol: str) -> pd.Timestamp | None:
+        with closing(self._connect()) as connection:
+            row = connection.execute("SELECT MAX(date) FROM daily_bars WHERE symbol = ?", (symbol.upper(),)).fetchone()
+        return pd.Timestamp(row[0]) if row and row[0] else None
+
     def record_strategy_run(self, run_id: str, strategy_name: str, symbol: str, completed_at: str, metrics: dict[str, float]) -> None:
         with closing(self._connect()) as connection, connection:
             connection.execute("INSERT OR REPLACE INTO strategy_runs VALUES (?, ?, ?, ?, ?)", (run_id, strategy_name, symbol, completed_at, json.dumps(metrics)))
