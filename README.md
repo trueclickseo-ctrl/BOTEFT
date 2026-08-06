@@ -97,6 +97,59 @@ The ML label asks whether a +6% target is reached before a -3% stop within 30 se
 
 The full rationale and experiment template are maintained in `STRATEGY_RESEARCH.md`.
 
+### Full-universe passive benchmark
+
+These runs use the same historical sample, 10% allocation, and cost model as the active-strategy research. `number_of_trades = 0` is expected: this is a passive benchmark rather than an order-by-order strategy.
+
+| ETF | Total return | Annual return | Sharpe | Maximum drawdown |
+|---|---:|---:|---:|---:|
+| SPY | 13.87% | 2.00% | 0.80 | -3.58% |
+| QQQ | 23.06% | 3.21% | 0.83 | -6.09% |
+| IWM | 3.49% | 0.69% | 0.34 | -3.58% |
+| DIA | 4.16% | 0.86% | 0.56 | -2.24% |
+| XLK | 14.14% | 2.68% | 0.80 | -3.85% |
+| XLF | 5.75% | 1.13% | 0.56 | -2.99% |
+| XLE | 13.55% | 2.71% | 0.68 | -4.66% |
+| XLV | 1.01% | 0.21% | 0.15 | -2.10% |
+| XLI | 6.93% | 1.42% | 0.72 | -2.57% |
+| XLY | 3.02% | 0.63% | 0.28 | -4.61% |
+| XLP | 1.85% | 0.39% | 0.28 | -1.98% |
+| TLT | -4.34% | -0.93% | -0.80 | -4.71% |
+| GLD | 15.55% | 3.08% | 0.99 | -4.72% |
+| SLV | 23.16% | 4.48% | 0.63 | -14.06% |
+
+This is the hurdle for future active strategies; a positive result alone is insufficient if passive exposure produced a better risk-adjusted return with lower complexity.
+
+Run the fixed ATR-breakout versus its passive benchmark across all stored ETFs with one command:
+
+```powershell
+.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.breakout_universe
+```
+
+The result includes per-ETF return, Sharpe, drawdown, trade count, evidence status, and a conservative verdict. It records research runs only and always returns `paper_trading_approved: False`.
+
+The first full-universe run found no approval candidate. QQQ and SLV each met the standalone 30-trade/Sharpe/drawdown gate, but their passive benchmarks delivered materially higher total returns. The breakout system is therefore retained only as a lower-drawdown research reference, not an execution strategy.
+
+### Next distinct strategy: dual momentum rotation
+
+`dual_momentum_rotation_v1` rebalances monthly into the single ETF with the strongest positive trailing 252-session momentum. When every ETF has non-positive momentum, it moves fully to cash. The selection uses the prior close, charges costs on every holding change, and compares its result with a fully invested equal-weight benchmark on the same common sample. It is research-only.
+
+```powershell
+.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.dual_momentum
+```
+
+The initial full-universe run returned 189.21% with a 0.87 Sharpe, ahead of equal weight's 68.69% and 0.85 Sharpe. However, its -42.45% drawdown exceeds the strict -20% portfolio limit, so it is rejected for paper trading and must not be retried unchanged.
+
+### Risk-targeted dual momentum
+
+`risk_targeted_dual_momentum_v1` is a separate, unlevered variant with a fixed 10% annual volatility budget, assessed at each monthly rebalance using only prior returns.
+
+```powershell
+.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.risk_targeted_dual_momentum
+```
+
+Its first full-universe run achieved 60.85% total return, 0.98 Sharpe, and -14.39% drawdown. It passes the risk limit and improves risk-adjusted return versus equal weight, but trails equal weight's 68.69% total return; it remains research-only.
+
 ## Safety controls
 
 - No look-ahead fills; signal entries execute next open in the daily backtester.
