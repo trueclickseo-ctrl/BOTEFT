@@ -151,3 +151,7 @@ Each trained model stores mean and standard-deviation statistics for its input f
 ## Operational readiness
 
 `GET /readiness` and the dashboard sidebar summarize whether market data exists, a quality-approved model is available, and the kill switch is inactive. The application can report paper readiness, but it never declares itself live-ready: live deployment remains an explicit operator, compliance, and broker-reconciliation decision.
+
+## Universe governance
+
+The initial ETF universe and an optional large-cap-stock universe are version-controlled in `config/universe.py`. Each instrument has sector metadata, which should be supplied to `RiskManager` when validating exposure. Add instruments only after verifying their Saxo UIC, asset type, exchange permissions, and historical data quality.
