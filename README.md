@@ -143,3 +143,7 @@ Before research begins, daily OHLCV data is checked for missing fields, duplicat
 Saxo submission is disabled in code by default. Even when enabled, a `runtime/KILL_SWITCH` file blocks every submission immediately. Live orders require both a code-level submission approval and `SAXO_ALLOW_LIVE_TRADING=true`; simulation remains the default. Never enable live trading until broker reconciliation and operator review are complete.
 
 `reconcile_positions` compares the local portfolio state with quantities returned by Saxo's net-position endpoint. Any mismatch is a fail-closed condition: investigate it before enabling another order.
+
+## Drift monitoring
+
+Each trained model stores mean and standard-deviation statistics for its input features. `detect_feature_drift` flags features whose current mean differs from the training distribution by three or more standard deviations. Treat drift as a research-review trigger before trusting new predictions.

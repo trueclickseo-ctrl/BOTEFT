@@ -63,7 +63,8 @@ def train_target_stop_model(
     }
     final_model = _make_model()
     final_model.fit(x, y)
-    artifact = ModelArtifact.create(final_model, columns, target_return, stop_loss, holding_period_days, metrics)
+    statistics = {column: {"mean": float(x[column].mean()), "std": float(x[column].std(ddof=0))} for column in columns}
+    artifact = ModelArtifact.create(final_model, columns, target_return, stop_loss, holding_period_days, metrics, statistics)
     return TrainingResult(artifact, oos)
 
 

@@ -19,10 +19,11 @@ class ModelArtifact:
     holding_period_days: int
     trained_at: str
     validation_metrics: dict[str, float]
+    feature_statistics: dict[str, dict[str, float]] | None = None
 
     @classmethod
-    def create(cls, model: Any, feature_columns: list[str], target_return: float, stop_loss: float, holding_period_days: int, validation_metrics: dict[str, float]) -> "ModelArtifact":
-        return cls(model, feature_columns, target_return, stop_loss, holding_period_days, datetime.now(UTC).isoformat(), validation_metrics)
+    def create(cls, model: Any, feature_columns: list[str], target_return: float, stop_loss: float, holding_period_days: int, validation_metrics: dict[str, float], feature_statistics: dict[str, dict[str, float]] | None = None) -> "ModelArtifact":
+        return cls(model, feature_columns, target_return, stop_loss, holding_period_days, datetime.now(UTC).isoformat(), validation_metrics, feature_statistics)
 
     def metadata(self) -> dict[str, Any]:
         data = asdict(self)
