@@ -53,6 +53,10 @@ def create_app() -> FastAPI:
     def leaderboard() -> list[dict[str, object]]:
         return json.loads(repository.strategy_leaderboard().to_json(orient="records"))
 
+    @app.get("/strategy-history")
+    def strategy_history() -> list[dict[str, object]]:
+        return json.loads(repository.strategy_history().to_json(orient="records", date_format="iso"))
+
     @app.get("/readiness")
     def readiness() -> dict[str, object]:
         return vars(assess_readiness(repository, manager))

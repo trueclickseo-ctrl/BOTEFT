@@ -107,6 +107,13 @@ class MarketDataRepository:
         frame["sharpe"] = metrics.map(lambda x: x.get("sharpe_ratio", 0.0))
         return frame.groupby("strategy_name", as_index=False).agg(runs=("strategy_name", "size"), average_total_return=("total_return", "mean"), average_sharpe=("sharpe", "mean")).sort_values(["average_sharpe", "average_total_return"], ascending=False, ignore_index=True)
 
+    def strategy_history(self, limit: int = 100) -> pd.DataFrame:
+        with closing(self._connect()) as connection:
+            frame = pd.read_sql_query("SELECT strategy_name, symbol, completed_at, metrics_json FROM strategy_runs ORDER BY completed_at DESC LIMIT ?", connection, params=[limit])
+        if frame.empty: return frame
+        metrics = pd.DataFrame.from_records(frame.pop("metrics_json").map(json.loads).tolist(), index=frame.index)
+        return pd.concat([frame, metrics], axis=1)
+
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.database_path)
 

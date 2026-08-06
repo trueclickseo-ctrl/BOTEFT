@@ -37,6 +37,15 @@ $env:SAXO_ENVIRONMENT = "sim"
 $env:SAXO_ACCESS_TOKEN = "your-token"
 ```
 
+For a 24-hour simulation token, create a local `.env` file from the template. It is ignored by Git and loaded automatically by every Saxo command:
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
+
+Set `SAXO_ACCESS_TOKEN`, `SAXO_ENVIRONMENT=sim`, and your verified `SAXO_INSTRUMENTS_JSON` in `.env`. Replace the token when Saxo expires it; never commit or share `.env`.
+
 Resolve verified UICs first:
 
 ```powershell
@@ -68,6 +77,12 @@ $env:SAXO_INSTRUMENTS_JSON = '{"SPY":{"uic":36590,"asset_type":"Etf"},"QQQ":{"ui
 .\.venv\Scripts\python.exe -m quant_ai_trader.workflows.cross_sectional --symbols QQQ IWM XLK XLF
 ```
 
+The research-only daily monitor refreshes mapped Saxo symbols and reruns fixed QQQ breakout validation. It never submits orders:
+
+```powershell
+.\.venv\Scripts\python.exe -c "from quant_ai_trader.workflows.daily_monitor import run; print(run(['SPY','QQQ','IWM','XLK','XLF']))"
+```
+
 The ML label asks whether a +6% target is reached before a -3% stop within 30 sessions. Model promotion requires at least 100 OOS observations, ROC-AUC >= 0.52, and average precision >= 0.05. Rejected models are logged and backtested but never saved as signal models.
 
 ## Strategies and results
@@ -78,6 +93,7 @@ The ML label asks whether a +6% target is reached before a -3% stop within 30 se
 | Momentum baseline | QQQ return 5.24%, Sharpe 0.83 | Research benchmark |
 | Cross-sectional ranking v1 | Sharpe 0.12; drawdown -36.97% | Rejected |
 | Cross-sectional ranking v2 defensive | Return 21.66%, Sharpe 0.43; drawdown -31.79% | Research only; not approved |
+| ATR breakout v1 | QQQ rolling validation: Sharpe 1.38, drawdown -0.82%, 26 trades; weak/negative on IWM | QQQ research candidate only; below 30-trade gate |
 
 The full rationale and experiment template are maintained in `STRATEGY_RESEARCH.md`.
 
@@ -101,7 +117,19 @@ The full rationale and experiment template are maintained in `STRATEGY_RESEARCH.
 Dashboard: `http://localhost:8501`  
 API: `http://localhost:8000`
 
-API endpoints: `/health`, `/readiness`, `/rankings`, `/backtests/{symbol}`, `/leaderboard`, `/portfolio`.
+API endpoints: `/health`, `/readiness`, `/rankings`, `/backtests/{symbol}`, `/leaderboard`, `/strategy-history`, `/portfolio`.
+
+`/strategy-history` returns individual recorded runs with their metrics, while `/leaderboard` aggregates strategy averages. Inspect both before judging a strategy: an aggregate can hide weak symbols or sparse trade samples.
+
+## Daily research monitor
+
+The monitor incrementally synchronizes completed Saxo daily bars, reruns fixed QQQ breakout rolling validation, and logs the result. It treats weekends, holidays, and incomplete daily bars as normal zero-update sessions.
+
+```powershell
+.\.venv\Scripts\python.exe -c "from quant_ai_trader.workflows.daily_monitor import run; print(run(['SPY','QQQ','IWM','XLK','XLF']))"
+```
+
+The monitor is research-only and contains no order-submission path. The QQQ ATR breakout remains below its 30-trade minimum; its rules must remain fixed while evidence accumulates.
 
 ## Containers and CI
 

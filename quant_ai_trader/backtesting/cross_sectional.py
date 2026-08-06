@@ -10,6 +10,7 @@ class CrossSectionalConfig:
     top_n: int = 2
     rebalance_days: int = 20
     trading_cost_bps: float = 5.0
+    daily_risk_off: bool = True
 
 def run_cross_sectional_backtest(feature_frames: dict[str, pd.DataFrame], config: CrossSectionalConfig = CrossSectionalConfig()):
     """Rebalance into top-ranked ETFs after each signal close, charging turnover costs."""
@@ -20,6 +21,11 @@ def run_cross_sectional_backtest(feature_frames: dict[str, pd.DataFrame], config
     for i, date in enumerate(dates):
         if i:
             previous = dates[i - 1]
+            if config.daily_risk_off and feature_frames[symbols[0]].loc[previous, "spy_trend_50"] <= 0:
+                turnover = sum(weights.values())
+                equity *= 1 - turnover * config.trading_cost_bps / 10_000
+                if weights: rebalance_log.append({"date": date, "symbols": "CASH", "turnover": turnover})
+                weights = {}
             gross_return = sum(weights.get(symbol, 0.0) * (feature_frames[symbol].loc[date, "adjusted_close"] / feature_frames[symbol].loc[previous, "adjusted_close"] - 1) for symbol in symbols)
             equity *= 1 + gross_return
         if i > 0 and i % config.rebalance_days == 0:

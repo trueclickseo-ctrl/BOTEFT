@@ -44,7 +44,7 @@ class ETFBacktester:
         missing_signals = required_signals - set(signals.columns)
         if missing_bars or missing_signals:
             raise ValueError(f"Missing bars: {sorted(missing_bars)}; missing signals: {sorted(missing_signals)}")
-        data = bars.join(signals.loc[:, sorted(required_signals)], how="left").sort_index()
+        data = bars.join(signals, how="left").sort_index()
         data[["entry_signal", "exit_signal"]] = data[["entry_signal", "exit_signal"]].fillna(False).astype(bool)
         cash, position, entry = self.config.initial_cash, None, None
         equity_values: list[float] = []
@@ -53,7 +53,8 @@ class ETFBacktester:
         for row_number, (timestamp, row) in enumerate(data.iterrows()):
             # A signal at yesterday's close fills at today's open.
             if position is None and row_number > 0 and bool(data.iloc[row_number - 1]["entry_signal"]):
-                entry = self._open_position(timestamp, float(row["open"]), cash)
+                prior = data.iloc[row_number - 1]
+                entry = self._open_position(timestamp, float(row["open"]), cash, prior.get("stop_loss_fraction"), prior.get("target_return_fraction"))
                 if entry is not None:
                     cash -= entry["entry_cost"]
                     position = entry
@@ -80,9 +81,11 @@ class ETFBacktester:
         metrics = calculate_performance(equity_curve, trades)
         return BacktestResult(equity_curve, trades, metrics)
 
-    def _open_position(self, timestamp: pd.Timestamp, raw_price: float, cash: float) -> dict[str, object] | None:
+    def _open_position(self, timestamp: pd.Timestamp, raw_price: float, cash: float, stop_override=None, target_override=None) -> dict[str, object] | None:
         entry_price = raw_price * (1 + self.config.slippage_bps / 10_000)
-        stop_price = entry_price * (1 - self.rules.stop_loss)
+        stop_loss = float(stop_override) if pd.notna(stop_override) else self.rules.stop_loss
+        target_return = float(target_override) if pd.notna(target_override) else self.rules.target_return
+        stop_price = entry_price * (1 - stop_loss)
         risk_per_share = entry_price - stop_price
         allocation_cap = min(cash, self.config.initial_cash) * self.config.maximum_allocation
         risk_cap = self.config.initial_cash * self.config.risk_per_trade
@@ -92,7 +95,7 @@ class ETFBacktester:
         commission = shares * self.config.commission_per_share
         return {
             "entry_time": timestamp, "entry_price": entry_price, "stop_price": stop_price,
-            "target_price": entry_price * (1 + self.rules.target_return), "shares": shares,
+            "target_price": entry_price * (1 + target_return), "shares": shares,
             "entry_commission": commission, "entry_cost": shares * entry_price + commission, "days_held": 0,
         }
 

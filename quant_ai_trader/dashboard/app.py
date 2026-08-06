@@ -2,6 +2,15 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Streamlit executes a script with its directory first on sys.path. Add the
+# repository root when launched as ``streamlit run quant_ai_trader/dashboard/app.py``.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 import streamlit as st
 
 from quant_ai_trader.config.settings import Settings
@@ -31,6 +40,7 @@ def main() -> None:
     except FileNotFoundError:
         st.info("No trained model artifact found. Complete the model-training workflow before rankings and backtests are available.")
         _render_portfolio()
+        _render_leaderboard(repository)
         return
 
     rankings = build_rankings(repository, artifact)
@@ -51,10 +61,18 @@ def main() -> None:
             st.line_chart(result.equity_curve)
             st.dataframe(result.trades, use_container_width=True, hide_index=True)
     _render_portfolio()
+    _render_leaderboard(repository)
+
+
+def _render_leaderboard(repository: MarketDataRepository) -> None:
     st.header("Strategy leaderboard")
     leaderboard = repository.strategy_leaderboard()
     if leaderboard.empty: st.caption("Run a research cycle to populate comparable strategy results.")
     else: st.dataframe(leaderboard, use_container_width=True, hide_index=True)
+    with st.expander("Strategy run history"):
+        history = repository.strategy_history()
+        if history.empty: st.caption("No recorded research runs.")
+        else: st.dataframe(history, use_container_width=True, hide_index=True)
 
 
 def _render_portfolio() -> None:

@@ -4,6 +4,7 @@ import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from dotenv import load_dotenv
 
 
 DEFAULT_ETF_UNIVERSE = (
@@ -54,6 +55,7 @@ class SaxoSettings:
 
     @classmethod
     def from_environment(cls) -> "SaxoSettings":
+        load_dotenv()
         token = os.getenv("SAXO_ACCESS_TOKEN")
         if not token:
             raise RuntimeError("SAXO_ACCESS_TOKEN is required; do not place broker credentials in source code.")
