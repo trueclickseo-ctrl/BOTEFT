@@ -16,6 +16,7 @@ This is the permanent decision log for strategy experiments. Record both success
 | AI target-before-stop | LightGBM probability; +6% target, -3% stop, 30 sessions; buy probability >=75%, bullish SPY regime | QQQ single-ETF research: total return 10.53%, Sharpe 2.71, 29 trades; ROC-AUC quality gate failed | Rejected | Do not use for paper/live signals. Re-evaluate only with pooled multi-ETF data and a new unseen period. |
 | AI target-before-stop, pooled v1 | Same model/rules; pooled QQQ, IWM, XLK, XLF; date-level purged walk-forward validation | ROC-AUC 0.5062, average precision 0.3546, Brier 0.3010, 4,053 OOS observations; average backtest return 2.87% | Rejected | Do not rerun unchanged. Feature/label design must change because discrimination is effectively random and fails the 0.52 ROC-AUC gate. |
 | Momentum baseline | Positive 20-day momentum and bullish SPY regime; standard target/stop exits | QQQ: total return 5.24%, Sharpe 0.83 | Research only | Benchmark for AI strategies; not an approved trading strategy. |
+| Regime-aware cross-sectional ranking v1 | Rank ETFs by 60-day momentum, SPY-relative strength, and volatility penalty; only when SPY trend is positive | Implementation only; no backtest yet | Research only | New strategy family. Validate with portfolio-level backtest before comparing with existing results. |
 
 ## Required evidence for a new candidate
 

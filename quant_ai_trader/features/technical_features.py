@@ -27,6 +27,7 @@ def add_technical_features(bars: pd.DataFrame) -> pd.DataFrame:
     frame["bollinger_lower"] = middle - 2 * deviation
     frame["bollinger_position"] = (close - frame["bollinger_lower"]) / (frame["bollinger_upper"] - frame["bollinger_lower"])
     frame["momentum_20"] = close.pct_change(20)
+    frame["momentum_60"] = close.pct_change(60)
     frame["volatility_20"] = close.pct_change().rolling(20, min_periods=20).std(ddof=0) * np.sqrt(252)
     frame["volume_change_5"] = volume.pct_change(5)
     frame["return_1d"] = close.pct_change()
@@ -53,4 +54,3 @@ def _validate_ohlcv(bars: pd.DataFrame) -> None:
         raise ValueError(f"Missing OHLCV columns: {sorted(missing)}")
     if not isinstance(bars.index, pd.DatetimeIndex):
         raise ValueError("Bars must use a DatetimeIndex")
-

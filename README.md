@@ -142,6 +142,14 @@ For pooled multi-ETF research after each symbol has been synced:
 
 The walk-forward split groups by trading date, so a given date cannot appear in both training and validation across different ETFs.
 
+The next strategy family is regime-aware cross-sectional ranking (`strategies/ranking_engine.py`): it ranks ETFs by 60-day momentum, strength relative to SPY, and a volatility penalty only in a positive SPY regime. It is research-only until a portfolio-level backtest is implemented.
+
+Look up candidate Saxo ETF mappings before syncing, then verify each returned listing:
+
+```powershell
+.\.venv\Scripts\python.exe -m quant_ai_trader.data.instrument_lookup IWM XLK XLF
+```
+
 Models are only promoted when their walk-forward validation satisfies the quality gate: at least 100 out-of-sample observations, ROC-AUC of 0.52 or higher, and average precision of 0.05 or higher. Rejected models are logged but are not saved or exposed as trading signals.
 
 Before research begins, daily OHLCV data is checked for missing fields, duplicate or unordered timestamps, invalid price ranges, non-positive prices, and negative volume. Large calendar gaps and unadjusted-close history are surfaced as warnings; malformed data blocks training.
