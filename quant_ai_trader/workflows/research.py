@@ -26,6 +26,10 @@ def build_training_dataset(repository: MarketDataRepository, symbol: str, settin
     return create_target_stop_labels(features, settings.target_return, settings.stop_loss, settings.holding_period_days)
 
 def build_pooled_training_dataset(repository: MarketDataRepository, symbols: list[str], settings: Settings):
+    available = set(repository.list_symbols())
+    missing = sorted({symbol.upper() for symbol in symbols if symbol.upper() not in available})
+    if "SPY" not in available: missing.append("SPY")
+    if missing: raise ValueError(f"Missing stored bars for: {', '.join(sorted(set(missing)))}")
     frames = []
     for symbol in symbols:
         frame = build_training_dataset(repository, symbol.upper(), settings).copy()
