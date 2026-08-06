@@ -1,173 +1,126 @@
-# Quant AI Trader — Phase 1
+# Quant AI Trader
 
-Production-oriented foundation for an AI ETF quantitative research and trading platform. Phase 1 delivers reliable daily market-data ingestion, SQLite storage, technical indicators, market-context features, data-quality controls, and tests. Sprint 2 adds leakage-aware ML labelling and LightGBM walk-forward research.
+Research-first Python framework for ETF and large-cap quantitative trading. It uses Saxo OpenAPI market data, validates models against time-aware research gates, compares strategies honestly, and keeps execution disabled until explicit safety controls are satisfied.
 
-## Design choices
+> This software is for research and paper-trading workflows. It is not investment advice and does not auto-authorize live trading.
 
-- **Production data source:** `SaxoBankProvider` uses Saxo OpenAPI chart data. The provider is isolated behind a small interface, retaining Yahoo Finance only as an explicit local-development fallback.
-- **Canonical data store:** daily OHLCV data is normalized into SQLite with idempotent symbol/date upserts. PostgreSQL can be introduced via a repository implementation without changing feature code.
-- **No look-ahead filling:** cleaning only forward-fills; it never back-fills future observations into historical rows. Indicators only use current and past bars.
-- **Robust outlier handling:** extreme numeric values are masked by median absolute deviation before historical forward fill. Raw bars remain retained in the database.
-- **Point-in-time fundamentals:** the placeholder explicitly reserves this for release-timestamped data, preventing accidental fundamental-data leakage.
+## Current status
 
-## Project layout
+| Area | Status |
+|---|---|
+| Saxo daily data, UIC lookup, SQLite storage | Implemented |
+| Technical and market-context features | Implemented |
+| LightGBM target-before-stop research | Implemented; current QQQ and pooled v1 results rejected |
+| Single-ETF and cross-sectional backtests | Implemented |
+| Risk limits, logging, readiness, drift and reconciliation | Implemented |
+| Dashboard, FastAPI, Docker, CI | Implemented |
+| Live order routing | Intentionally disabled by default |
 
-```
-quant_ai_trader/
-  config/settings.py                 Runtime configuration and ETF universe
-  data/market_data.py                Provider interface + Yahoo Finance adapter
-  data/database.py                   SQLite daily-bar repository
-  features/technical_features.py     SMA, EMA, RSI, MACD, ATR, bands, momentum, volatility
-  features/feature_pipeline.py       Market context and data-quality pipeline
-  features/labels.py                 Target-before-stop labels from future OHLC bars
-  models/train_model.py              Purged walk-forward LightGBM training
-  models/predict.py                  Latest-row research prediction
-  models/model_manager.py            Versioned joblib model artifacts
-  strategies/etf_strategy.py         Probability, risk/reward, and market-regime rules
-  backtesting/backtester.py          Next-open fills, costs, target/stop exits, trade ledger
-  backtesting/performance.py         Return, Sharpe, drawdown, win-rate, profit-factor metrics
-  risk/position_sizing.py            Whole-share risk and allocation constrained sizing
-  risk/portfolio_manager.py          Cash, positions, market marks, and sector exposure state
-  risk/risk_manager.py               Pre-trade limits and explicit order approval decisions
-  api/app.py                          Read-only FastAPI rankings, backtest, and portfolio endpoints
-  dashboard/app.py                    Streamlit research dashboard
-  execution/broker_interface.py       Saxo v2 pre-check/order adapter (submission disabled by default)
-  execution/paper_trading.py          Deterministic paper-order lifecycle
-  observability/logging.py             Rotating structured JSON audit logs
-  main.py                            Collection/feature-generation CLI
-tests/                               Unit tests
-```
+See [STRATEGY_RESEARCH.md](STRATEGY_RESEARCH.md) for the permanent experiment register, including failed variants that must not be rerun unchanged.
 
 ## Setup
 
 Python 3.12+ is required.
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
-## Collect daily data through Saxo OpenAPI
+## Saxo simulation setup
 
-The end date is exclusive, matching the provider convention.
-
-Configure the token and the **verified** UIC/asset-type mapping obtained from Saxo's instrument reference data. Never commit tokens or account identifiers.
+Never put credentials in Git or chat. In the same PowerShell session used to run commands:
 
 ```powershell
-$env:SAXO_ENVIRONMENT = "sim" # use "live" only after production controls are approved
-$env:SAXO_ACCESS_TOKEN = "your-short-lived-openapi-token"
-$env:SAXO_INSTRUMENTS_JSON = '{"SPY":{"uic":123456,"asset_type":"Etf"},"QQQ":{"uic":234567,"asset_type":"Etf"}}'
-python -m quant_ai_trader.main --start 2020-01-01 --end 2026-01-01 --symbols SPY QQQ
+$env:SAXO_ENVIRONMENT = "sim"
+$env:SAXO_ACCESS_TOKEN = "your-token"
 ```
 
-The UIC values above are illustrative—do not use them in production. Saxo identifies instruments by both UIC and asset type, and the correct ETF listing depends on the permitted trading venue and account setup. The default is Saxo simulation; the code fails closed when a token or mapping is absent.
-
-For local, non-production development only:
+Resolve verified UICs first:
 
 ```powershell
-python -m quant_ai_trader.main --provider yahoo --start 2020-01-01 --end 2026-01-01 --symbols SPY QQQ
+.\.venv\Scripts\python.exe -m quant_ai_trader.data.instrument_lookup SPY QQQ IWM XLK XLF
 ```
 
-This creates `data/quant_ai_trader.sqlite3` locally, which is ignored by Git. `SPY` is automatically used as market context if included in the stored data. VIX support is ready via `build_feature_dataset(..., vix_bars=...)` using a mapped volatility instrument.
-
-Saxo chart samples provide OHLCV but not a separate adjusted-close field. Phase 1 records the raw close in `adjusted_close` with that limitation documented; before training, Phase 2 will add a versioned corporate-actions adjustment pipeline. Saxo documents that chart history can be corrected, so a future synchronizer will track chart `DataVersion` and re-fetch corrected series.
-
-## Run tests
+Then set the mapping using only real numeric UICs:
 
 ```powershell
-python -m pytest -q
+$env:SAXO_INSTRUMENTS_JSON = '{"SPY":{"uic":36590,"asset_type":"Etf"},"QQQ":{"uic":4328771,"asset_type":"Etf"}}'
 ```
 
-## Phase 1 feature set
-
-Technical features include SMA 20/50/200, EMA 20, RSI 14, MACD/signal/histogram, ATR 14, Bollinger bands, 20-day momentum, annualized 20-day volatility, and five-day volume change. Market-context features include SPY 50-day trend and 20-day return, plus optional VIX level.
-
-Sector performance and breadth need a defined constituent/universe dataset and will be added alongside training-label design in Phase 2, where their point-in-time construction can be validated rigorously.
-
-## Sprint 2: model research
-
-`create_target_stop_labels` labels a signal date as positive only when its +6% target is reached before its -3% stop within 30 trading days. When a daily bar crosses both levels, the label is deliberately negative because daily data cannot establish intraday order. Incomplete future horizons remain unlabelled. The original +5% / -3% illustration has a 1.67 risk/reward ratio, so it cannot meet the required minimum ratio of 2.0; the default target is therefore +6%.
-
-Training uses chronological `TimeSeriesSplit` folds with a 30-day purge gap so outcomes in the training fold do not overlap its validation period. It reports out-of-sample ROC-AUC, average precision, and Brier score, then persists the final model with its feature schema and target/stop metadata. Signals remain research-only until the backtesting and risk phases are complete.
-
-## Sprint 3: strategy and backtesting
-
-The ETF strategy enters only when buy probability is at least 75%, risk/reward is at least 2, and SPY's 50-day trend is positive. Signals are known at the close and fill at the next session's open. The backtester supports cash-based risk position sizing, 10% allocation caps, commission, slippage, stop/target exits, probability exits, maximum holding periods, an equity curve, and a closed-trade ledger. If target and stop occur on the same daily candle, the stop is assumed first.
-
-## Sprint 4: portfolio risk controls
-
-Every prospective order passes through `RiskManager` before it can be submitted. The default $100,000 account risks 1% per trade and rejects orders that exceed ten positions, 10% in an ETF, 30% in a sector, available cash, or the 2.0 risk/reward rule. Decisions include a machine-readable reason, enabling the future Saxo execution adapter to fail closed.
-
-## Sprint 5: API and dashboard
-
-Start the API and dashboard from the repository root:
+## Daily data and research workflow
 
 ```powershell
-.\.venv\Scripts\uvicorn.exe quant_ai_trader.api.app:app --reload
+# Sync data. End date is exclusive.
+.\.venv\Scripts\python.exe -m quant_ai_trader.main --start 2021-08-01 --end 2026-08-08 --symbols SPY QQQ IWM XLK XLF
+
+# Train/evaluate a single ETF model.
+.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.research --symbol QQQ
+
+# Pooled, date-safe multi-ETF research.
+.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.research --symbol QQQ IWM XLK XLF
+
+# Cross-sectional portfolio strategy evaluation.
+.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.cross_sectional --symbols QQQ IWM XLK XLF
+```
+
+The ML label asks whether a +6% target is reached before a -3% stop within 30 sessions. Model promotion requires at least 100 OOS observations, ROC-AUC >= 0.52, and average precision >= 0.05. Rejected models are logged and backtested but never saved as signal models.
+
+## Strategies and results
+
+| Strategy | Current result | Decision |
+|---|---|---|
+| AI target-before-stop, pooled v1 | ROC-AUC 0.5062; 4,053 OOS observations | Rejected |
+| Momentum baseline | QQQ return 5.24%, Sharpe 0.83 | Research benchmark |
+| Cross-sectional ranking v1 | Sharpe 0.12; drawdown -36.97% | Rejected |
+| Cross-sectional ranking v2 defensive | Return 21.66%, Sharpe 0.43; drawdown -31.79% | Research only; not approved |
+
+The full rationale and experiment template are maintained in `STRATEGY_RESEARCH.md`.
+
+## Safety controls
+
+- No look-ahead fills; signal entries execute next open in the daily backtester.
+- Data checks reject invalid OHLCV, duplicate timestamps, and invalid price ranges.
+- Portfolio limits: 1% risk/trade, 10 positions, 10% per ETF, 30% per sector.
+- `runtime/KILL_SWITCH` blocks all broker submissions immediately.
+- Live submission requires code-level enablement plus `SAXO_ALLOW_LIVE_TRADING=true`.
+- Saxo net positions must reconcile with local positions before further orders.
+- Feature drift is flagged at a three-standard-deviation mean shift.
+
+## Dashboard and API
+
+```powershell
 .\.venv\Scripts\streamlit.exe run quant_ai_trader/dashboard/app.py
+.\.venv\Scripts\uvicorn.exe quant_ai_trader.api.app:app --reload
 ```
 
-The API provides `GET /health`, `/rankings`, `/backtests/{symbol}`, and `/portfolio`. Both UI and API are read-only research surfaces: they require synced bars and a saved model artifact, and never submit Saxo orders.
+Dashboard: `http://localhost:8501`  
+API: `http://localhost:8000`
 
-## Sprint 6: execution, logs, and strategy leaderboard
+API endpoints: `/health`, `/readiness`, `/rankings`, `/backtests/{symbol}`, `/leaderboard`, `/portfolio`.
 
-Saxo orders use the v2 pre-check endpoint before the order endpoint. Live submission is disabled by default; use `PaperBroker` until reconciliation and account-specific safeguards are approved. `configure_logging()` writes rotating JSONL audit logs to `logs/` without secrets. Persist completed backtests with `MarketDataRepository.record_strategy_run(...)`; `strategy_leaderboard()` ranks strategies by average Sharpe, then average total return.
-
-## Container deployment
-
-Copy `.env.example` to `.env`, add only a simulation token and verified instrument mappings, then run:
+## Containers and CI
 
 ```powershell
+Copy-Item .env.example .env
 docker compose up --build
 ```
 
-The API is available at `http://localhost:8000` and the dashboard at `http://localhost:8501`. Data, models, and logs are mounted to local directories and never baked into the image. GitHub Actions runs the complete test suite on Python 3.12 for every push and pull request.
+Data, artifacts, and logs are mounted locally, not included in images. GitHub Actions runs tests on Python 3.12.
 
-## Repeatable research cycle
+## Project layout
 
-After syncing sufficient Saxo history for `SPY` and an ETF, run:
-
-```powershell
-.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.research --symbol QQQ
 ```
-
-This creates a labelled dataset, runs purged walk-forward training, saves the model artifact, backtests the AI strategy and a transparent momentum baseline, writes an audit log, and records both results in the SQLite strategy leaderboard. The API endpoint `GET /leaderboard` and dashboard rank strategies by average Sharpe then total return.
-
-For pooled multi-ETF research after each symbol has been synced:
-
-```powershell
-.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.research --symbol QQQ IWM XLK XLF
+quant_ai_trader/
+  data/           Saxo provider, SQLite, data quality, UIC lookup
+  features/       technical features, labels, dataset pipeline
+  models/         LightGBM training, prediction, gates, drift checks
+  strategies/     AI rules, baselines, cross-sectional rankings
+  backtesting/    single-ETF and portfolio backtests
+  risk/           sizing, exposure controls, portfolio state
+  execution/      paper/Saxo interfaces, safety, reconciliation
+  dashboard/      Streamlit interface and research services
+  api/            FastAPI service
+  workflows/      repeatable research commands
 ```
-
-The walk-forward split groups by trading date, so a given date cannot appear in both training and validation across different ETFs.
-
-The next strategy family is regime-aware cross-sectional ranking (`strategies/ranking_engine.py`): it ranks ETFs by 60-day momentum, strength relative to SPY, and a volatility penalty only in a positive SPY regime. It is research-only until a portfolio-level backtest is implemented.
-
-Look up candidate Saxo ETF mappings before syncing, then verify each returned listing:
-
-```powershell
-.\.venv\Scripts\python.exe -m quant_ai_trader.data.instrument_lookup IWM XLK XLF
-```
-
-Models are only promoted when their walk-forward validation satisfies the quality gate: at least 100 out-of-sample observations, ROC-AUC of 0.52 or higher, and average precision of 0.05 or higher. Rejected models are logged but are not saved or exposed as trading signals.
-
-Before research begins, daily OHLCV data is checked for missing fields, duplicate or unordered timestamps, invalid price ranges, non-positive prices, and negative volume. Large calendar gaps and unadjusted-close history are surfaced as warnings; malformed data blocks training.
-
-## Execution safety
-
-Saxo submission is disabled in code by default. Even when enabled, a `runtime/KILL_SWITCH` file blocks every submission immediately. Live orders require both a code-level submission approval and `SAXO_ALLOW_LIVE_TRADING=true`; simulation remains the default. Never enable live trading until broker reconciliation and operator review are complete.
-
-`reconcile_positions` compares the local portfolio state with quantities returned by Saxo's net-position endpoint. Any mismatch is a fail-closed condition: investigate it before enabling another order.
-
-## Drift monitoring
-
-Each trained model stores mean and standard-deviation statistics for its input features. `detect_feature_drift` flags features whose current mean differs from the training distribution by three or more standard deviations. Treat drift as a research-review trigger before trusting new predictions.
-
-## Operational readiness
-
-`GET /readiness` and the dashboard sidebar summarize whether market data exists, a quality-approved model is available, and the kill switch is inactive. The application can report paper readiness, but it never declares itself live-ready: live deployment remains an explicit operator, compliance, and broker-reconciliation decision.
-
-## Universe governance
-
-The initial ETF universe and an optional large-cap-stock universe are version-controlled in `config/universe.py`. Each instrument has sector metadata, which should be supplied to `RiskManager` when validating exposure. Add instruments only after verifying their Saxo UIC, asset type, exchange permissions, and historical data quality.
