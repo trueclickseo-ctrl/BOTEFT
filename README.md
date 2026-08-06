@@ -123,3 +123,13 @@ docker compose up --build
 ```
 
 The API is available at `http://localhost:8000` and the dashboard at `http://localhost:8501`. Data, models, and logs are mounted to local directories and never baked into the image. GitHub Actions runs the complete test suite on Python 3.12 for every push and pull request.
+
+## Repeatable research cycle
+
+After syncing sufficient Saxo history for `SPY` and an ETF, run:
+
+```powershell
+.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.research --symbol QQQ
+```
+
+This creates a labelled dataset, runs purged walk-forward training, saves the model artifact, backtests the strategy, writes an audit log, and records the result in the SQLite strategy leaderboard.
