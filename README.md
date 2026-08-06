@@ -137,3 +137,9 @@ This creates a labelled dataset, runs purged walk-forward training, saves the mo
 Models are only promoted when their walk-forward validation satisfies the quality gate: at least 100 out-of-sample observations, ROC-AUC of 0.52 or higher, and average precision of 0.05 or higher. Rejected models are logged but are not saved or exposed as trading signals.
 
 Before research begins, daily OHLCV data is checked for missing fields, duplicate or unordered timestamps, invalid price ranges, non-positive prices, and negative volume. Large calendar gaps and unadjusted-close history are surfaced as warnings; malformed data blocks training.
+
+## Execution safety
+
+Saxo submission is disabled in code by default. Even when enabled, a `runtime/KILL_SWITCH` file blocks every submission immediately. Live orders require both a code-level submission approval and `SAXO_ALLOW_LIVE_TRADING=true`; simulation remains the default. Never enable live trading until broker reconciliation and operator review are complete.
+
+`reconcile_positions` compares the local portfolio state with quantities returned by Saxo's net-position endpoint. Any mismatch is a fail-closed condition: investigate it before enabling another order.
