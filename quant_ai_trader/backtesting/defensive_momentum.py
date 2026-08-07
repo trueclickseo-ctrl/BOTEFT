@@ -39,6 +39,25 @@ class DefensiveMomentumConfig:
     tail_vol_lookback: int = 252
     tail_cut_exposure: float = .30
     tail_cooldown_days: int = 10
+    existing_position_rebalance_threshold: float = 0.0
+    risk_adjusted_momentum_ranking: bool = False
+    spy_regime_hysteresis: float = 0.0
+    rank_hysteresis_buffer: int = 0
+    continuous_spy_regime_width: float = 0.0
+
+
+def select_ranked_with_hysteresis(ranking_score: pd.Series, eligible_mask: pd.Series,
+                                  previous_members: set[str], holdings: int,
+                                  buffer: int) -> pd.Index:
+    ranked = list(ranking_score[eligible_mask].dropna().sort_values(ascending=False).index)
+    if buffer <= 0:
+        return pd.Index(ranked[:holdings])
+    retained = [symbol for symbol in ranked[:holdings + buffer] if symbol in previous_members]
+    selected = retained[:holdings]
+    for symbol in ranked[:holdings]:
+        if symbol not in selected and len(selected) < holdings:
+            selected.append(symbol)
+    return pd.Index(selected)
 
 
 def run_defensive_momentum_backtest(
@@ -61,6 +80,7 @@ def run_defensive_momentum_backtest(
     curve, decisions = [], []
     total_turnover, total_orders, resize_count = 0.0, 0, 0
     tail_multiplier, tail_clean_days, tail_transition_count = 1.0, config.tail_cooldown_days, 0
+    spy_regime_state = False
 
     def trade_to(desired: pd.Series) -> tuple[float, int]:
         nonlocal equity, weights, total_turnover, total_orders
@@ -80,16 +100,44 @@ def run_defensive_momentum_backtest(
 
     for i, date in enumerate(dates):
         if i > 0:
-            equity *= max(1.0 + float((weights * returns.iloc[i]).sum()), 0.0)
+            period_returns = returns.iloc[i]
+            portfolio_return = float((weights * period_returns).sum())
+            equity *= max(1.0 + portfolio_return, 0.0)
+            if 1 + portfolio_return > 0:
+                weights = weights * (1 + period_returns) / (1 + portfolio_return)
         if i > required and (i - required - 1) % config.rebalance_days == 0:
             signal = i - 1
+            previous_members = set(base_weights[base_weights > 0].index)
             new_weights = pd.Series(0.0, index=symbols)
-            spy_risk_on = prices.iloc[signal]["SPY"] > prices["SPY"].iloc[signal-config.trend_lookback_days+1:signal+1].mean()
+            spy_ma = prices["SPY"].iloc[signal-config.trend_lookback_days+1:signal+1].mean()
+            spy_distance = float(prices.iloc[signal]["SPY"] / spy_ma - 1)
+            spy_regime_multiplier = 1.0
+            if config.continuous_spy_regime_width > 0:
+                spy_regime_multiplier = min(1.0, max(0.0, 1 + spy_distance / config.continuous_spy_regime_width))
+                spy_risk_on = spy_regime_multiplier > 0
+            elif config.spy_regime_hysteresis > 0:
+                if spy_regime_state and spy_distance < -config.spy_regime_hysteresis:
+                    spy_regime_state = False
+                elif not spy_regime_state and spy_distance > config.spy_regime_hysteresis:
+                    spy_regime_state = True
+                spy_risk_on = spy_regime_state
+                spy_regime_multiplier = 1.0 if spy_risk_on else 0.0
+            else:
+                spy_risk_on = spy_distance > 0
+                spy_regime_multiplier = 1.0 if spy_risk_on else 0.0
             momentum_end = signal - config.skip_recent_days
             momentum = prices.iloc[momentum_end] / prices.iloc[momentum_end-config.momentum_lookback_days] - 1
             asset_uptrend = prices.iloc[signal] > prices.iloc[signal-config.trend_lookback_days+1:signal+1].mean()
             eligible_mask = (momentum > 0) & (asset_uptrend if config.require_asset_uptrend else True)
-            eligible = momentum[eligible_mask].nlargest(config.holdings) if spy_risk_on else pd.Series(dtype=float)
+            ranking_score = momentum
+            if config.risk_adjusted_momentum_ranking:
+                ranking_vol = returns.iloc[momentum_end-config.momentum_lookback_days+1:momentum_end+1].std(ddof=1) * math.sqrt(252)
+                ranking_score = momentum / ranking_vol.replace(0, float("nan"))
+            selected = select_ranked_with_hysteresis(
+                ranking_score, eligible_mask, previous_members, config.holdings,
+                config.rank_hysteresis_buffer) if spy_risk_on else pd.Index([])
+            eligible = ranking_score.loc[selected]
+            eligible_universe = set(ranking_score[eligible_mask].dropna().index)
             if len(eligible):
                 asset_vol = returns[list(eligible.index)].iloc[signal-config.volatility_lookback_days+1:signal+1].std(ddof=1) * math.sqrt(252)
                 inverse_vol = (1 / asset_vol.replace(0, float("nan"))).dropna()
@@ -99,11 +147,33 @@ def run_defensive_momentum_backtest(
                 scale = min(1.0, config.target_annual_volatility / portfolio_vol) if portfolio_vol > 0 else 0.0
                 new_weights.loc[raw.index] = (raw * scale).clip(upper=config.maximum_etf_weight)
             base_weights = new_weights
-            target = base_weights * tail_multiplier
+            target = base_weights * tail_multiplier * spy_regime_multiplier
+            if config.existing_position_rebalance_threshold > 0:
+                same_position = (target > 0) & (weights > 0)
+                within_band = (target - weights).abs() < config.existing_position_rebalance_threshold
+                target[same_position & within_band] = weights[same_position & within_band]
+            target_changes = (target - weights).abs()
+            small_resize_orders = int(((target_changes > 1e-12) & (target_changes < .01)).sum())
+            current_members = set(base_weights[base_weights > 0].index)
+            exited_members = previous_members - current_members
+            regime_exits = len(exited_members) if not spy_risk_on else 0
+            momentum_exits = sum(symbol not in eligible_universe and momentum.get(symbol, float("nan")) <= 0
+                                 for symbol in exited_members) if spy_risk_on else 0
+            ma_exits = sum(symbol not in eligible_universe and momentum.get(symbol, float("nan")) > 0
+                           and not bool(asset_uptrend.get(symbol, False))
+                           for symbol in exited_members) if spy_risk_on else 0
+            rank_exits = sum(symbol in eligible_universe for symbol in exited_members) if spy_risk_on else 0
             turnover, order_count = (0.0, 0) if config.dynamic_vol_targeting else trade_to(target)
             decisions.append({"date": date, "signal_date": dates[signal], "risk_on": spy_risk_on,
+                              "spy_ma_distance": spy_distance,
+                              "spy_regime_multiplier": spy_regime_multiplier,
                               "holdings": int((base_weights > 0).sum()), "exposure": float(base_weights.sum()),
-                              "turnover": turnover, "order_count": order_count})
+                              "turnover": turnover, "order_count": order_count,
+                              "membership_changes": len(previous_members.symmetric_difference(current_members)),
+                              "regime_exits": regime_exits, "momentum_exits": momentum_exits,
+                              "ma_exits": ma_exits, "rank_exits": rank_exits,
+                              "small_resize_orders": small_resize_orders,
+                              "selected": ",".join(sorted(current_members))})
         if config.dynamic_vol_targeting and i >= config.overlay_volatility_window and i % config.resize_days == 0:
             trailing = returns.iloc[i-config.overlay_volatility_window+1:i+1]
             vol = (trailing.std(ddof=1) * math.sqrt(252)).clip(lower=config.overlay_volatility_floor)

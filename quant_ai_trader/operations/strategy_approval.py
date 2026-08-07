@@ -67,6 +67,34 @@ STRATEGY_APPROVALS: dict[str, StrategyApproval] = {
         "us_etf_momentum_v3_tail", StrategyStatus.REJECTED,
         "Independent base-return tail overlay produced 0.46 Sharpe and -24.39% drawdown.",
     ),
+    "defensive_momentum_v2_one_percent_band": StrategyApproval(
+        "defensive_momentum_v2_one_percent_band", StrategyStatus.REJECTED,
+        "Orders fell by 48 percent, but exact-cost Sharpe remained 0.63.",
+    ),
+    "defensive_momentum_v2_risk_adjusted_ranking": StrategyApproval(
+        "defensive_momentum_v2_risk_adjusted_ranking", StrategyStatus.REJECTED,
+        "Adjusted-data Sharpe improved to 0.72 but remained below 0.75.",
+    ),
+    "defensive_momentum_v2_spy_hysteresis": StrategyApproval(
+        "defensive_momentum_v2_spy_hysteresis", StrategyStatus.REJECTED,
+        "Two-percent SPY hysteresis reduced churn but lowered Sharpe to 0.61.",
+    ),
+    "defensive_momentum_v2_rank_hysteresis": StrategyApproval(
+        "defensive_momentum_v2_rank_hysteresis", StrategyStatus.REJECTED,
+        "Top-eight/top-ten rank hysteresis cut churn but Sharpe remained 0.66.",
+    ),
+    "defensive_momentum_v2_continuous_spy_regime": StrategyApproval(
+        "defensive_momentum_v2_continuous_spy_regime", StrategyStatus.REJECTED,
+        "Linear SPY exposure smoothing reduced Sharpe to 0.62.",
+    ),
+    "defensive_momentum_v2_42_session_cadence": StrategyApproval(
+        "defensive_momentum_v2_42_session_cadence", StrategyStatus.REJECTED,
+        "Slower cadence reduced Sharpe to 0.61 and fold consistency to three of four.",
+    ),
+    "defensive_momentum_v2_expanded_19": StrategyApproval(
+        "defensive_momentum_v2_expanded_19", StrategyStatus.REJECTED,
+        "Price-only expanded universe reduced same-sample Sharpe to 0.47.",
+    ),
 }
 
 

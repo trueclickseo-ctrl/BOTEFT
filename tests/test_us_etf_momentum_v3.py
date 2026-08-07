@@ -28,3 +28,13 @@ def test_weight_engine_charges_exact_minimum_commission():
     weights = pd.DataFrame({"A": [0., .001]}, index=dates)
     _, costs, _ = run_weight_backtest(prices, weights, WeightEngineConfig(fx_and_slippage_bps=0))
     assert costs.iloc[-1]["commission"] == 1
+
+
+def test_weight_engine_allows_weights_to_drift_without_rebalancing():
+    dates = pd.bdate_range("2024-01-01", periods=3)
+    prices = pd.DataFrame({"A": [100., 110., 121.], "B": [100., 100., 100.]}, index=dates)
+    weights = pd.DataFrame({"A": [.5, .5, .5], "B": [.5, .5, .5]}, index=dates)
+    _, costs, metrics = run_weight_backtest(prices, weights, WeightEngineConfig(
+        commission_bps=0, minimum_commission=0, fx_and_slippage_bps=0))
+    assert len(costs) == 1
+    assert metrics["total_return"] > .10

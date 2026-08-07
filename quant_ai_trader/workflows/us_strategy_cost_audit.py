@@ -46,8 +46,8 @@ def _portfolio_row(name: str, curve: pd.Series, metrics: dict, stress_curve: pd.
             "approved": approved, "blockers": list(blockers)}
 
 
-def run() -> dict[str, object]:
-    repository = MarketDataRepository(Settings().database_path)
+def run(database_path=None) -> dict[str, object]:
+    repository = MarketDataRepository(database_path or Settings().database_path)
     bars = {symbol: repository.load_bars(symbol) for symbol in DEFAULT_UNIVERSE}
     spy = bars["SPY"]
     features = {symbol: build_feature_dataset(frame, spy_bars=spy) for symbol, frame in bars.items()}
