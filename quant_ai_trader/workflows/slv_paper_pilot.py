@@ -5,6 +5,7 @@ from quant_ai_trader.config.settings import Settings
 from quant_ai_trader.data.database import MarketDataRepository
 from quant_ai_trader.features.feature_pipeline import build_feature_dataset
 from quant_ai_trader.strategies.breakout import breakout_signals
+from quant_ai_trader.operations.strategy_approval import approval_for
 
 
 SLEEVE_NAME = "slv_atr_breakout_v1"
@@ -18,6 +19,9 @@ def run() -> dict[str, object]:
     latest, bar = signals.iloc[-1], bars.iloc[-1]
     if not bool(latest["entry_signal"]):
         return {"symbol":"SLV", "as_of":str(bars.index[-1].date()), "decision":"NO_TRADE", "reason":"fixed_breakout_entry_not_active", "capital_sleeve":sleeve, "orders_created":False}
+    approval = approval_for("atr_breakout_v1_slv")
+    if not approval.may_submit_paper_order:
+        return {"symbol":"SLV", "as_of":str(bars.index[-1].date()), "decision":"BLOCKED_STRATEGY_NOT_APPROVED", "reason":approval.reason, "capital_sleeve":sleeve, "orders_created":False}
     return {"symbol":"SLV", "as_of":str(bars.index[-1].date()), "decision":"PAPER_PLAN_REQUIRES_FX_PRECHECK", "reference_close":float(bar["close"]), "stop_loss_fraction":float(latest["stop_loss_fraction"]), "target_return_fraction":float(latest["target_return_fraction"]), "capital_sleeve":sleeve, "orders_created":False}
 
 if __name__ == "__main__":

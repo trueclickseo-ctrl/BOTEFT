@@ -18,6 +18,20 @@ class BacktestConfig:
     maximum_allocation: float = 0.10
     commission_per_share: float = 0.005
     slippage_bps: float = 2.0
+    minimum_commission: float = 0.0
+    commission_bps: float = 0.0
+    fx_conversion_bps: float = 0.0
+
+    @classmethod
+    def saxo_us_etf_eur(cls, *, stress_multiplier: float = 1.0) -> "BacktestConfig":
+        """Published Saxo Classic US-ETF pricing plus conservative execution costs."""
+        return cls(
+            commission_per_share=0.0,
+            minimum_commission=1.0 * stress_multiplier,
+            commission_bps=8.0 * stress_multiplier,
+            slippage_bps=5.0 * stress_multiplier,
+            fx_conversion_bps=25.0 * stress_multiplier,
+        )
 
 
 @dataclass(frozen=True)
@@ -92,11 +106,13 @@ class ETFBacktester:
         shares = int(min(risk_cap / risk_per_share, allocation_cap / entry_price))
         if shares < 1:
             return None
-        commission = shares * self.config.commission_per_share
+        notional = shares * entry_price
+        commission, fx_cost = self._transaction_cost(notional, shares)
         return {
             "entry_time": timestamp, "entry_price": entry_price, "stop_price": stop_price,
             "target_price": entry_price * (1 + target_return), "shares": shares,
-            "entry_commission": commission, "entry_cost": shares * entry_price + commission, "days_held": 0,
+            "entry_commission": commission, "entry_fx_cost": fx_cost,
+            "entry_cost": notional + commission + fx_cost, "days_held": 0,
         }
 
     def _exit_price(self, row: pd.Series, position: dict[str, object]) -> tuple[str | None, float | None]:
@@ -116,13 +132,25 @@ class ETFBacktester:
     def _close_position(self, timestamp: pd.Timestamp, position: dict[str, object], raw_price: float, reason: str, cash: float) -> tuple[float, dict[str, object]]:
         exit_price = raw_price * (1 - self.config.slippage_bps / 10_000)
         shares = int(position["shares"])
-        exit_commission = shares * self.config.commission_per_share
-        proceeds = shares * exit_price - exit_commission
+        notional = shares * exit_price
+        exit_commission, exit_fx_cost = self._transaction_cost(notional, shares)
+        proceeds = notional - exit_commission - exit_fx_cost
         net_pnl = proceeds - float(position["entry_cost"])
         trade = {
             "entry_time": position["entry_time"], "exit_time": timestamp, "entry_price": position["entry_price"],
             "exit_price": exit_price, "shares": shares, "days_held": position["days_held"], "exit_reason": reason,
             "entry_commission": position["entry_commission"], "exit_commission": exit_commission, "net_pnl": net_pnl,
+            "entry_fx_cost": position.get("entry_fx_cost", 0.0), "exit_fx_cost": exit_fx_cost,
+            "total_cost": float(position["entry_commission"]) + float(position.get("entry_fx_cost", 0.0)) + exit_commission + exit_fx_cost,
             "return_pct": net_pnl / float(position["entry_cost"]),
         }
         return cash + proceeds, trade
+
+    def _transaction_cost(self, notional: float, shares: int) -> tuple[float, float]:
+        commission = max(
+            shares * self.config.commission_per_share,
+            self.config.minimum_commission,
+            notional * self.config.commission_bps / 10_000,
+        )
+        fx_cost = notional * self.config.fx_conversion_bps / 10_000
+        return float(commission), float(fx_cost)

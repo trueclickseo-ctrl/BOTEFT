@@ -39,6 +39,18 @@ class PaginatedSession:
         return PaginatedResponse(params["Time"])
 
 
+class InconsistentCandleResponse(FakeResponse):
+    def json(self):
+        return {"Data": [
+            {"Time": "2024-01-02T00:00:00Z", "Open": 100, "High": 102, "Low": 101, "Close": 102, "Volume": 1000},
+        ]}
+
+
+class InconsistentCandleSession(FakeSession):
+    def get(self, url, params, timeout):
+        return InconsistentCandleResponse()
+
+
 def test_saxo_provider_normalizes_chart_samples():
     provider = SaxoBankProvider("test-token", {"SPY": SaxoInstrument(42)}, "https://example.test/openapi", FakeSession())
     bars = provider.fetch_daily_bars("SPY", "2024-01-01", "2024-01-04")
@@ -54,3 +66,9 @@ def test_saxo_provider_paginates_multi_year_requests():
     assert len(session.calls) == 3
     assert len(bars) == 3
     assert all(call["Count"] <= 1200 for call in session.calls)
+
+
+def test_saxo_provider_expands_candle_range_to_include_open_and_close():
+    provider = SaxoBankProvider("test-token", {"SPY": SaxoInstrument(42)}, "https://example.test/openapi", InconsistentCandleSession())
+    bars = provider.fetch_daily_bars("SPY", "2024-01-01", "2024-01-03")
+    assert bars.iloc[0]["low"] == 100

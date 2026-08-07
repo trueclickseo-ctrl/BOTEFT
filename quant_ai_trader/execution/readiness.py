@@ -12,7 +12,7 @@ class PaperReadinessReport:
     blockers: tuple[str, ...]
 
 
-def assess_paper_readiness(*, operator_approved: bool, account_key: str | None, environment: str, safety: TradingSafety, reconciliation: ReconciliationResult, allocation_translator_ready: bool) -> PaperReadinessReport:
+def assess_paper_readiness(*, operator_approved: bool, strategy_approved: bool, account_key: str | None, environment: str, safety: TradingSafety, reconciliation: ReconciliationResult, allocation_translator_ready: bool) -> PaperReadinessReport:
     """Return all blockers; no implicit approval and no broker side effects."""
     safety_clear = True
     try:
@@ -21,6 +21,7 @@ def assess_paper_readiness(*, operator_approved: bool, account_key: str | None, 
         safety_clear = False
     checks = {
         "operator_approved": operator_approved,
+        "strategy_approved": strategy_approved,
         "simulation_environment": environment == "sim",
         "account_key_configured": bool(account_key),
         "kill_switch_inactive": safety_clear,
@@ -29,6 +30,7 @@ def assess_paper_readiness(*, operator_approved: bool, account_key: str | None, 
     }
     labels = {
         "operator_approved": "operator approval required",
+        "strategy_approved": "strategy is not approved for paper trading",
         "simulation_environment": "paper trading requires SAXO_ENVIRONMENT=sim",
         "account_key_configured": "SAXO_ACCOUNT_KEY is required",
         "kill_switch_inactive": "kill switch is active or environment is invalid",

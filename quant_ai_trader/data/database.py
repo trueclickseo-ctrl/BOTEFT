@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from quant_ai_trader.data.quality import validate_daily_bars
+
 
 REQUIRED_COLUMNS = ("open", "high", "low", "close", "volume", "adjusted_close")
 
@@ -144,3 +146,6 @@ class MarketDataRepository:
             raise ValueError("Bars must use a DatetimeIndex")
         if bars.index.has_duplicates:
             raise ValueError("Bars must not contain duplicate timestamps")
+        report = validate_daily_bars(bars)
+        if not report.valid:
+            raise ValueError(f"Invalid OHLCV bars: {','.join(report.errors)}")

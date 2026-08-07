@@ -92,6 +92,12 @@ class SaxoBankProvider:
         bars["date"] = pd.to_datetime(bars["date"], utc=True).dt.tz_localize(None)
         bars = bars.set_index("date").sort_index().loc[lambda frame: ~frame.index.duplicated(keep="last")]
         bars = bars.loc[(bars.index >= start_time) & (bars.index < end_time)]
+        # Saxo chart samples can report an opening reference outside the
+        # intraday high/low range (for example around opening auctions). Keep
+        # the original open/close while expanding the candle envelope so the
+        # normalized OHLC contract remains internally consistent.
+        bars["high"] = bars[["open", "high", "close"]].max(axis=1)
+        bars["low"] = bars[["open", "low", "close"]].min(axis=1)
         # Chart data is unadjusted. Corporate-action adjustment is a dedicated future
         # pipeline; retaining this explicitly avoids silently claiming adjusted history.
         bars["adjusted_close"] = bars["close"]

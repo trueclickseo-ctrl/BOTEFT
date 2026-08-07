@@ -13,6 +13,7 @@ class DualMomentumConfig:
     lookback_days: int = 252
     rebalance_days: int = 21
     trading_cost_bps: float = 5.0
+    fixed_cost_per_order: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,11 @@ def run_dual_momentum_backtest(price_frames: dict[str, pd.DataFrame], config: Du
             selected = returns.idxmax() if returns.max() > 0 else None
             turnover = float(selected != holding)
             equity *= 1 - turnover * config.trading_cost_bps / 10_000
+            if turnover:
+                order_count = int(holding is not None) + int(selected is not None)
+                equity = max(equity - order_count * config.fixed_cost_per_order, 0.0)
+            if equity == 0:
+                selected = None
             holding = selected
             decisions.append({"date": date, "signal_date": signal_date, "holding": holding or "CASH", "momentum": float(returns.max()), "turnover": turnover})
         curve.append(equity)
@@ -93,6 +99,11 @@ def run_risk_targeted_dual_momentum_backtest(price_frames: dict[str, pd.DataFram
                 new_exposure = min(1.0, config.target_annual_volatility / annualized_volatility) if annualized_volatility > 0 else 0.0
             turnover = abs(new_exposure - exposure) if selected == holding else new_exposure + exposure
             equity *= 1 - turnover * config.trading_cost_bps / 10_000
+            if turnover:
+                order_count = 1 if selected == holding else int(holding is not None and exposure > 0) + int(selected is not None and new_exposure > 0)
+                equity = max(equity - order_count * config.fixed_cost_per_order, 0.0)
+            if equity == 0:
+                selected, new_exposure = None, 0.0
             holding, exposure = selected, new_exposure
             decisions.append({"date": date, "signal_date": dates[signal_index], "holding": holding or "CASH", "momentum": float(momentum.max()), "annualized_volatility": annualized_volatility, "exposure": exposure, "turnover": turnover})
         curve.append(equity)

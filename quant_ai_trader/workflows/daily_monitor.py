@@ -12,7 +12,9 @@ def run(symbols: list[str], candidate_symbol: str = "QQQ") -> dict:
     repo = MarketDataRepository(settings.database_path); repo.initialize()
     instruments = {name: SaxoInstrument(**details) for name, details in saxo.instruments.items()}
     provider = SaxoBankProvider(saxo.access_token, instruments, saxo.base_url)
-    end = (date.today() + timedelta(days=1)).isoformat()
+    # End is exclusive. Using today's date prevents an in-progress daily bar
+    # from entering research or driving a decision during the market session.
+    end = date.today().isoformat()
     updated = {}
     for symbol in symbols:
         latest = repo.latest_bar_date(symbol)

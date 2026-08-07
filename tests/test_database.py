@@ -6,11 +6,12 @@ def test_upsert_and_load_bars(tmp_path, sample_bars):
     repository.initialize()
     assert repository.upsert_bars("spy", sample_bars.iloc[:5]) == 5
     updated = sample_bars.iloc[:5].copy()
-    updated.iloc[0, updated.columns.get_loc("close")] = 999
+    replacement_close = float(updated.iloc[0]["close"] + 0.1)
+    updated.iloc[0, updated.columns.get_loc("close")] = replacement_close
     repository.upsert_bars("SPY", updated)
     loaded = repository.load_bars("SPY")
     assert len(loaded) == 5
-    assert loaded.iloc[0]["close"] == 999
+    assert loaded.iloc[0]["close"] == replacement_close
     assert repository.latest_bar_date("SPY") == sample_bars.index[4]
 
 def test_capital_sleeve_preserves_only_its_own_equity(tmp_path):

@@ -31,4 +31,6 @@ def calculate_performance(equity_curve: pd.Series, trades: pd.DataFrame, trading
         "total_return": float(total_return), "annual_return": float(annual_return), "sharpe_ratio": sharpe,
         "maximum_drawdown": maximum_drawdown, "win_rate": float((pnl > 0).mean()), "profit_factor": profit_factor,
         "number_of_trades": float(len(trades)),
+        "average_net_profit": float(pnl.mean()),
+        "average_trade_cost": float(trades["total_cost"].mean()) if "total_cost" in trades else 0.0,
     }
