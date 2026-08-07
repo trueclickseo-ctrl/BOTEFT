@@ -85,70 +85,9 @@ The research-only daily monitor refreshes mapped Saxo symbols and reruns fixed Q
 
 The ML label asks whether a +6% target is reached before a -3% stop within 30 sessions. Model promotion requires at least 100 OOS observations, ROC-AUC >= 0.52, and average precision >= 0.05. Rejected models are logged and backtested but never saved as signal models.
 
-## Strategies and results
+## Strategy research
 
-| Strategy | Current result | Decision |
-|---|---|---|
-| AI target-before-stop, pooled v1 | ROC-AUC 0.5062; 4,053 OOS observations | Rejected |
-| Momentum baseline | QQQ return 5.24%, Sharpe 0.83 | Research benchmark |
-| Cross-sectional ranking v1 | Sharpe 0.12; drawdown -36.97% | Rejected |
-| Cross-sectional ranking v2 defensive | Return 21.66%, Sharpe 0.43; drawdown -31.79% | Research only; not approved |
-| ATR breakout v1 | QQQ rolling validation: Sharpe 1.38, drawdown -0.82%, 26 trades; weak/negative on IWM | QQQ research candidate only; below 30-trade gate |
-
-The full rationale and experiment template are maintained in `STRATEGY_RESEARCH.md`.
-
-### Full-universe passive benchmark
-
-These runs use the same historical sample, 10% allocation, and cost model as the active-strategy research. `number_of_trades = 0` is expected: this is a passive benchmark rather than an order-by-order strategy.
-
-| ETF | Total return | Annual return | Sharpe | Maximum drawdown |
-|---|---:|---:|---:|---:|
-| SPY | 13.87% | 2.00% | 0.80 | -3.58% |
-| QQQ | 23.06% | 3.21% | 0.83 | -6.09% |
-| IWM | 3.49% | 0.69% | 0.34 | -3.58% |
-| DIA | 4.16% | 0.86% | 0.56 | -2.24% |
-| XLK | 14.14% | 2.68% | 0.80 | -3.85% |
-| XLF | 5.75% | 1.13% | 0.56 | -2.99% |
-| XLE | 13.55% | 2.71% | 0.68 | -4.66% |
-| XLV | 1.01% | 0.21% | 0.15 | -2.10% |
-| XLI | 6.93% | 1.42% | 0.72 | -2.57% |
-| XLY | 3.02% | 0.63% | 0.28 | -4.61% |
-| XLP | 1.85% | 0.39% | 0.28 | -1.98% |
-| TLT | -4.34% | -0.93% | -0.80 | -4.71% |
-| GLD | 15.55% | 3.08% | 0.99 | -4.72% |
-| SLV | 23.16% | 4.48% | 0.63 | -14.06% |
-
-This is the hurdle for future active strategies; a positive result alone is insufficient if passive exposure produced a better risk-adjusted return with lower complexity.
-
-Run the fixed ATR-breakout versus its passive benchmark across all stored ETFs with one command:
-
-```powershell
-.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.breakout_universe
-```
-
-The result includes per-ETF return, Sharpe, drawdown, trade count, evidence status, and a conservative verdict. It records research runs only and always returns `paper_trading_approved: False`.
-
-The first full-universe run found no approval candidate. QQQ and SLV each met the standalone 30-trade/Sharpe/drawdown gate, but their passive benchmarks delivered materially higher total returns. The breakout system is therefore retained only as a lower-drawdown research reference, not an execution strategy.
-
-### Next distinct strategy: dual momentum rotation
-
-`dual_momentum_rotation_v1` rebalances monthly into the single ETF with the strongest positive trailing 252-session momentum. When every ETF has non-positive momentum, it moves fully to cash. The selection uses the prior close, charges costs on every holding change, and compares its result with a fully invested equal-weight benchmark on the same common sample. It is research-only.
-
-```powershell
-.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.dual_momentum
-```
-
-The initial full-universe run returned 189.21% with a 0.87 Sharpe, ahead of equal weight's 68.69% and 0.85 Sharpe. However, its -42.45% drawdown exceeds the strict -20% portfolio limit, so it is rejected for paper trading and must not be retried unchanged.
-
-### Risk-targeted dual momentum
-
-`risk_targeted_dual_momentum_v1` is a separate, unlevered variant with a fixed 10% annual volatility budget, assessed at each monthly rebalance using only prior returns.
-
-```powershell
-.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.risk_targeted_dual_momentum
-```
-
-Its first full-universe run achieved 60.85% total return, 0.98 Sharpe, and -14.39% drawdown. It passes the risk limit and improves risk-adjusted return versus equal weight, but trails equal weight's 68.69% total return; it remains research-only.
+All strategy specifications, benchmark comparisons, test outcomes, rejected variants, and promotion decisions are maintained exclusively in [STRATEGY_RESEARCH.md](STRATEGY_RESEARCH.md). That document is the authoritative strategy decision log; this README describes how to install and operate the platform.
 
 ## Safety controls
 
@@ -160,6 +99,20 @@ Its first full-universe run achieved 60.85% total return, 0.98 Sharpe, and -14.3
 - Saxo net positions must reconcile with local positions before further orders.
 - Feature drift is flagged at a three-standard-deviation mean shift.
 
+Run the non-mutating paper-trading preflight before any future paper deployment:
+
+```powershell
+.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.paper_readiness
+```
+
+The preflight is intentionally fail-closed. It reports the missing approval, reconciliation, account, or implementation requirement; it never submits an order.
+
+The controlled SLV paper-pilot planner is also non-submitting; it returns `NO_TRADE` unless the fixed breakout condition is active:
+
+```powershell
+.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.slv_paper_pilot
+```
+
 ## Dashboard and API
 
 ```powershell
@@ -170,7 +123,7 @@ Its first full-universe run achieved 60.85% total return, 0.98 Sharpe, and -14.3
 Dashboard: `http://localhost:8501`  
 API: `http://localhost:8000`
 
-API endpoints: `/health`, `/readiness`, `/rankings`, `/backtests/{symbol}`, `/leaderboard`, `/strategy-history`, `/portfolio`.
+API endpoints: `/health`, `/readiness`, `/paper-readiness`, `/rankings`, `/backtests/{symbol}`, `/leaderboard`, `/strategy-history`, `/portfolio`.
 
 `/strategy-history` returns individual recorded runs with their metrics, while `/leaderboard` aggregates strategy averages. Inspect both before judging a strategy: an aggregate can hide weak symbols or sparse trade samples.
 

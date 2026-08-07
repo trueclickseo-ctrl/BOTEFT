@@ -69,37 +69,46 @@ class SaxoBankProvider:
         if instrument is None:
             raise ValueError(f"No Saxo UIC/AssetType mapping configured for {symbol}")
         start_time, end_time = pd.Timestamp(start), pd.Timestamp(end)
-        requested_days = max((end_time - start_time).days, 1)
-        response = self.session.get(
-            f"{self.base_url}/chart/v3/charts",
-            params={
-                "Uic": instrument.uic,
-                "AssetType": instrument.asset_type,
-                "Horizon": 1440,
-                "Mode": "From",
-                "Time": start_time.strftime("%Y-%m-%dT00:00:00Z"),
-                "Count": min(max(requested_days + 15, 100), 1200),
-            },
-            timeout=30,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        samples = payload.get("Data", [])
-        if not samples:
+        if start_time >= end_time:
+            raise ValueError("Start date must be earlier than end date")
+        # Saxo's chart endpoint caps Count at 1,200. Use calendar windows below
+        # that limit so a multi-year research request is never silently truncated.
+        windows: list[pd.DataFrame] = []
+        cursor = start_time
+        while cursor < end_time:
+            window_end = min(cursor + pd.DateOffset(days=1000), end_time)
+            samples = self._fetch_chart_window(instrument, cursor, window_end)
+            if samples:
+                windows.append(pd.DataFrame(samples))
+            cursor = window_end
+        if not windows:
             raise ValueError(f"No chart samples returned by Saxo for {symbol}")
-        bars = pd.DataFrame(samples)
+        bars = pd.concat(windows, ignore_index=True)
         rename_map = {"Time": "date", "Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"}
         missing = set(rename_map) - set(bars.columns)
         if missing:
             raise ValueError(f"Saxo chart response missing columns: {sorted(missing)}")
         bars = bars.rename(columns=rename_map).loc[:, ["date", "open", "high", "low", "close", "volume"]]
         bars["date"] = pd.to_datetime(bars["date"], utc=True).dt.tz_localize(None)
-        bars = bars.set_index("date").sort_index()
+        bars = bars.set_index("date").sort_index().loc[lambda frame: ~frame.index.duplicated(keep="last")]
         bars = bars.loc[(bars.index >= start_time) & (bars.index < end_time)]
         # Chart data is unadjusted. Corporate-action adjustment is a dedicated future
         # pipeline; retaining this explicitly avoids silently claiming adjusted history.
         bars["adjusted_close"] = bars["close"]
         return bars.loc[:, REQUIRED_COLUMNS]
+
+    def _fetch_chart_window(self, instrument: SaxoInstrument, start_time: pd.Timestamp, end_time: pd.Timestamp) -> list[dict[str, Any]]:
+        requested_days = max((end_time - start_time).days, 1)
+        response = self.session.get(
+            f"{self.base_url}/chart/v3/charts",
+            params={
+                "Uic": instrument.uic, "AssetType": instrument.asset_type, "Horizon": 1440,
+                "Mode": "From", "Time": start_time.strftime("%Y-%m-%dT00:00:00Z"),
+                "Count": min(max(requested_days + 15, 100), 1200),
+            }, timeout=30,
+        )
+        response.raise_for_status()
+        return response.json().get("Data", [])
 
 
 def sync_symbol(provider: MarketDataProvider, repository: object, symbol: str, start: str, end: str) -> int:

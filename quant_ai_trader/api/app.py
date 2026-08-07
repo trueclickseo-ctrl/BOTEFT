@@ -12,6 +12,7 @@ from quant_ai_trader.data.database import MarketDataRepository
 from quant_ai_trader.models.model_manager import ModelManager
 from quant_ai_trader.risk.portfolio_manager import PortfolioManager
 from quant_ai_trader.operations.readiness import assess_readiness
+from quant_ai_trader.workflows.paper_readiness import run as paper_readiness
 
 
 def create_app() -> FastAPI:
@@ -60,6 +61,10 @@ def create_app() -> FastAPI:
     @app.get("/readiness")
     def readiness() -> dict[str, object]:
         return vars(assess_readiness(repository, manager))
+
+    @app.get("/paper-readiness")
+    def paper_readiness_status() -> dict[str, object]:
+        return paper_readiness()
 
     return app
 

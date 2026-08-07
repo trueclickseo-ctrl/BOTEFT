@@ -43,6 +43,6 @@ def model_feature_columns(frame: pd.DataFrame) -> list[str]:
     """Select numerical engineered features, excluding raw prices and unobserved labels."""
     excluded = {
         "open", "high", "low", "close", "volume", "adjusted_close", "target",
-        "target_hit_before_stop", "realized_return", "days_to_exit",
+        "target_hit_before_stop", "realized_return", "days_to_exit", "forward_return",
     }
     return [column for column in frame.select_dtypes(include=[np.number]).columns if column not in excluded]

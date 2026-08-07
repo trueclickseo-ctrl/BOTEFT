@@ -102,3 +102,42 @@ def run_risk_targeted_dual_momentum_backtest(price_frames: dict[str, pd.DataFram
     metrics["average_exposure"] = float(pd.DataFrame(decisions)["exposure"].mean()) if decisions else 0.0
     metrics["cash_rebalances"] = float(sum(item["holding"] == "CASH" for item in decisions))
     return equity_curve, pd.DataFrame(decisions), metrics
+
+
+def run_volatility_matched_equal_weight_backtest(price_frames: dict[str, pd.DataFrame], config: RiskTargetedDualMomentumConfig = RiskTargetedDualMomentumConfig()) -> tuple[pd.Series, dict[str, float]]:
+    """Monthly volatility-scaled equal-weight benchmark, with no leverage."""
+    if not price_frames:
+        raise ValueError("At least one ETF price frame is required")
+    symbols = sorted(price_frames)
+    dates = sorted(set.intersection(*(set(frame.index) for frame in price_frames.values())))
+    if len(dates) <= config.volatility_lookback_days + 1:
+        raise ValueError("Insufficient common history for volatility-matched benchmark")
+    prices = pd.DataFrame({symbol: price_frames[symbol].loc[dates, "adjusted_close"] for symbol in symbols}, index=dates)
+    basket_returns = prices.pct_change().mean(axis=1)
+    equity, exposure, curve = config.initial_cash, 0.0, []
+    for i, date in enumerate(dates):
+        if i > 0:
+            equity *= 1 + exposure * float(basket_returns.iloc[i])
+        if i > config.volatility_lookback_days and (i - config.volatility_lookback_days - 1) % config.rebalance_days == 0:
+            signal_returns = basket_returns.iloc[i - config.volatility_lookback_days:i]
+            annualized_volatility = float(signal_returns.std(ddof=1) * math.sqrt(252))
+            new_exposure = min(1.0, config.target_annual_volatility / annualized_volatility) if annualized_volatility > 0 else 0.0
+            equity *= 1 - abs(new_exposure - exposure) * config.trading_cost_bps / 10_000
+            exposure = new_exposure
+        curve.append(equity)
+    equity_curve = pd.Series(curve, index=dates, name="equity")
+    return equity_curve, calculate_performance(equity_curve, pd.DataFrame())
+
+
+def latest_volatility_matched_exposure(price_frames: dict[str, pd.DataFrame], config: RiskTargetedDualMomentumConfig = RiskTargetedDualMomentumConfig()) -> float:
+    """Exposure selected at the last completed monthly core rebalance."""
+    symbols = sorted(price_frames)
+    dates = sorted(set.intersection(*(set(frame.index) for frame in price_frames.values())))
+    if len(dates) <= config.volatility_lookback_days + 1:
+        raise ValueError("Insufficient common history for volatility-matched benchmark")
+    prices = pd.DataFrame({symbol: price_frames[symbol].loc[dates, "adjusted_close"] for symbol in symbols}, index=dates)
+    returns = prices.pct_change().mean(axis=1)
+    rebalance_indices = [i for i in range(len(dates)) if i > config.volatility_lookback_days and (i - config.volatility_lookback_days - 1) % config.rebalance_days == 0]
+    signal_index = rebalance_indices[-1]
+    annualized_volatility = float(returns.iloc[signal_index - config.volatility_lookback_days:signal_index].std(ddof=1) * math.sqrt(252))
+    return min(1.0, config.target_annual_volatility / annualized_volatility) if annualized_volatility > 0 else 0.0

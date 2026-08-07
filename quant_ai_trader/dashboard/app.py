@@ -19,6 +19,7 @@ from quant_ai_trader.data.database import MarketDataRepository
 from quant_ai_trader.models.model_manager import ModelManager
 from quant_ai_trader.risk.portfolio_manager import PortfolioManager
 from quant_ai_trader.operations.readiness import assess_readiness
+from quant_ai_trader.workflows.paper_readiness import run as paper_readiness
 
 
 def main() -> None:
@@ -40,6 +41,7 @@ def main() -> None:
     except FileNotFoundError:
         st.info("No trained model artifact found. Complete the model-training workflow before rankings and backtests are available.")
         _render_portfolio()
+        _render_governance()
         _render_leaderboard(repository)
         return
 
@@ -61,6 +63,7 @@ def main() -> None:
             st.line_chart(result.equity_curve)
             st.dataframe(result.trades, use_container_width=True, hide_index=True)
     _render_portfolio()
+    _render_governance()
     _render_leaderboard(repository)
 
 
@@ -83,6 +86,19 @@ def _render_portfolio() -> None:
         return
     rows = [{"symbol": p.symbol, "sector": p.sector, "shares": p.shares, "market_value": p.market_value} for p in portfolio.positions.values()]
     st.dataframe(rows, use_container_width=True, hide_index=True)
+
+
+def _render_governance() -> None:
+    """Expose fail-closed order blockers beside research results."""
+    st.header("Paper-trading governance")
+    report = paper_readiness()
+    if report["ready"]:
+        st.success("Paper-trading preflight passed. No order is submitted from this dashboard.")
+    else:
+        st.warning("Paper trading is blocked. Research signals are not orders.")
+        st.dataframe([{"blocker": blocker} for blocker in report["blockers"]], use_container_width=True, hide_index=True)
+    with st.expander("Preflight checks"):
+        st.json(report["checks"])
 
 
 if __name__ == "__main__":
