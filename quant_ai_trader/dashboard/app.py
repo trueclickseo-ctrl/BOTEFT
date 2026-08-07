@@ -20,6 +20,7 @@ from quant_ai_trader.models.model_manager import ModelManager
 from quant_ai_trader.risk.portfolio_manager import PortfolioManager
 from quant_ai_trader.operations.readiness import assess_readiness
 from quant_ai_trader.workflows.paper_readiness import run as paper_readiness
+from quant_ai_trader.workflows.stocks.decision import run as stock_decision
 
 
 def main() -> None:
@@ -36,6 +37,7 @@ def main() -> None:
     st.sidebar.header("Research data")
     st.sidebar.write(f"Database: `{settings.database_path}`")
     st.sidebar.write(f"Model directory: `{settings.model_directory}`")
+    _render_stock_decision()
     try:
         artifact = manager.load()
     except FileNotFoundError:
@@ -86,6 +88,35 @@ def _render_portfolio() -> None:
         return
     rows = [{"symbol": p.symbol, "sector": p.sector, "shares": p.shares, "market_value": p.market_value} for p in portfolio.positions.values()]
     st.dataframe(rows, use_container_width=True, hide_index=True)
+
+
+def _render_stock_decision() -> None:
+    st.header("Stock decision engine")
+    try:
+        decision = stock_decision()
+    except (FileNotFoundError, ValueError) as error:
+        st.warning(f"Stock decision unavailable: {error}")
+        return
+    action = decision["action"]
+    symbol = decision["symbol"] or "CASH"
+    if action in {"BUY", "ROTATE"}:
+        st.success(f"{action} {symbol}")
+    elif action == "HOLD":
+        st.info(f"HOLD {symbol}")
+    else:
+        st.warning(action)
+    columns = st.columns(4)
+    columns[0].metric("Target weight", f"{decision['target_weight']:.2%}")
+    columns[1].metric("Momentum", f"{decision['trailing_momentum']:.2%}" if decision["trailing_momentum"] is not None else "n/a")
+    columns[2].metric("Last rebalance", decision["last_rebalance_date"])
+    columns[3].metric("Next review", decision["next_review_date"])
+    st.caption(decision["reason"])
+    if decision["submission_authorized"]:
+        st.success("SIM submission gates are satisfied. This dashboard still does not submit orders.")
+    else:
+        st.warning("Signal active; order submission blocked.")
+        with st.expander("Execution blockers"):
+            st.json(decision["blockers"])
 
 
 def _render_governance() -> None:

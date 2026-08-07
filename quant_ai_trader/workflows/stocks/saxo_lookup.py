@@ -4,11 +4,11 @@ from quant_ai_trader.config.settings import SaxoSettings
 from quant_ai_trader.workflows.stocks.universe import US_STOCK_UNIVERSE
 
 
-def run(settings=None):
+def resolve(symbols, settings=None):
     settings=settings or SaxoSettings.from_environment()
     session=requests.Session(); session.headers.update({"Authorization":f"Bearer {settings.access_token}"})
     resolved={}; missing=[]
-    for symbol in US_STOCK_UNIVERSE:
+    for symbol in symbols:
         response=session.get(f"{settings.base_url}/ref/v1/instruments",params={"AssetTypes":"Stock","Keywords":symbol,"$top":20},timeout=30)
         response.raise_for_status()
         matches=[x for x in response.json().get("Data",[]) if x.get("Symbol","").split(":")[0].upper()==symbol]
@@ -17,6 +17,10 @@ def run(settings=None):
         if choice is None: missing.append(symbol); continue
         resolved[symbol]={"uic":int(choice["Identifier"]),"asset_type":str(choice["AssetType"]),"symbol":choice.get("Symbol")}
     return {"resolved":resolved,"missing":missing,"all_resolved":not missing}
+
+
+def run(settings=None):
+    return resolve(US_STOCK_UNIVERSE, settings)
 
 
 if __name__=="__main__":

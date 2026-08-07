@@ -62,3 +62,19 @@ did not promote any candidate. The central strategy
 registry remains fail-closed. Approval additionally requires point-in-time
 universe evidence, share rounding, Saxo instrument/UIC checks, broker prechecks,
 and preregistered forward validation.
+
+## Signal publication layer
+
+The stock engine now publishes a separate market decision and execution status.
+`BUY`, `HOLD`, `ROTATE`, `EXIT`, and `CASH` describe what the frozen signal says
+for the current tactical sleeve. They do not imply statistical approval or
+broker authorization. The output includes the selected symbol, target weight,
+momentum, signal/rebalance dates, whole-share target when account equity is
+provided, Saxo mapping state, and explicit submission blockers. It is exposed
+read-only at `/stocks/decision` and on the dashboard.
+
+On 2026-08-07 the operational output was `BUY CAT` at a 10% tactical
+target. The signal used the 2026-07-15 close, rebalanced on 2026-07-16, and
+scheduled its next 21-business-session review for 2026-08-14. Saxo SIM
+read-only validation resolved `CAT:xnys` as Stock UIC 305. No precheck or order
+submission endpoint was called.

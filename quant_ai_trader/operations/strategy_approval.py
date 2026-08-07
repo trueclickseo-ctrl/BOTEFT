@@ -101,7 +101,7 @@ STRATEGY_APPROVALS: dict[str, StrategyApproval] = {
     ),
     "stock_core_satellite_consolidated_v1": StrategyApproval(
         "stock_core_satellite_consolidated_v1", StrategyStatus.RESEARCH_ONLY,
-        "Same-sample numerical gates pass, but the current-constituent universe has survivorship bias, dividend withholding and Saxo tradability are unverified, and no forward evidence exists.",
+        "The signal is operational and Saxo SIM instruments resolve, but bootstrap robustness was 81.3% versus the frozen 95% requirement; current-constituent bias, dividend withholding, and forward evidence remain unresolved.",
     ),
 }
 

@@ -16,6 +16,7 @@ from quant_ai_trader.risk.portfolio_manager import PortfolioManager
 from quant_ai_trader.operations.readiness import assess_readiness
 from quant_ai_trader.workflows.paper_readiness import run as paper_readiness
 from quant_ai_trader.execution.saxo_oauth import SaxoOAuthClient, SaxoOAuthSettings
+from quant_ai_trader.workflows.stocks.decision import run as stock_decision
 
 
 def create_app() -> FastAPI:
@@ -73,6 +74,14 @@ def create_app() -> FastAPI:
     @app.get("/paper-readiness")
     def paper_readiness_status() -> dict[str, object]:
         return paper_readiness()
+
+    @app.get("/stocks/decision")
+    def latest_stock_decision(validate_saxo: bool = False) -> dict[str, object]:
+        """Publish the current stock signal; this endpoint cannot submit orders."""
+        try:
+            return stock_decision(validate_saxo=validate_saxo)
+        except (FileNotFoundError, RuntimeError, ValueError) as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
 
     @app.get("/auth/saxo/login")
     def saxo_login() -> RedirectResponse:
