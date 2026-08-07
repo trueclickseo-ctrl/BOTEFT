@@ -6,6 +6,9 @@ __pycache__/
 data/*.db
 data/*.sqlite
 data/*.sqlite3
+data/**/*.db
+data/**/*.sqlite
+data/**/*.sqlite3
 data/saxo_oauth_tokens.json
 *.csv
 .env

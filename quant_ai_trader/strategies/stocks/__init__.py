@@ -1,0 +1,1 @@
+"""Stock-only research strategies."""

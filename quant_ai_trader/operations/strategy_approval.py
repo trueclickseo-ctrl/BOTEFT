@@ -95,6 +95,14 @@ STRATEGY_APPROVALS: dict[str, StrategyApproval] = {
         "defensive_momentum_v2_expanded_19", StrategyStatus.REJECTED,
         "Price-only expanded universe reduced same-sample Sharpe to 0.47.",
     ),
+    "frozen_core_v2_50_50_consolidated": StrategyApproval(
+        "frozen_core_v2_50_50_consolidated", StrategyStatus.RESEARCH_ONLY,
+        "Numerical gates pass after capped weight consolidation, but the selected sample is not independent and forward validation from 2026-08-08 is incomplete.",
+    ),
+    "stock_core_satellite_consolidated_v1": StrategyApproval(
+        "stock_core_satellite_consolidated_v1", StrategyStatus.RESEARCH_ONLY,
+        "Same-sample numerical gates pass, but the current-constituent universe has survivorship bias, dividend withholding and Saxo tradability are unverified, and no forward evidence exists.",
+    ),
 }
 
 

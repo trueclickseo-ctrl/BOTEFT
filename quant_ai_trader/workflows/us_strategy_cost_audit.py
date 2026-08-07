@@ -1,4 +1,4 @@
-"""Unified corrected-cost audit for every implemented US ETF strategy family."""
+"""Shared corrected-cost screening harness for an explicitly supplied US universe."""
 from __future__ import annotations
 
 import pandas as pd
@@ -46,10 +46,10 @@ def _portfolio_row(name: str, curve: pd.Series, metrics: dict, stress_curve: pd.
             "approved": approved, "blockers": list(blockers)}
 
 
-def run(database_path=None) -> dict[str, object]:
+def run(database_path=None, universe=DEFAULT_UNIVERSE, benchmark_symbol="SPY") -> dict[str, object]:
     repository = MarketDataRepository(database_path or Settings().database_path)
-    bars = {symbol: repository.load_bars(symbol) for symbol in DEFAULT_UNIVERSE}
-    spy = bars["SPY"]
+    bars = {symbol: repository.load_bars(symbol) for symbol in universe}
+    spy = repository.load_bars(benchmark_symbol)
     features = {symbol: build_feature_dataset(frame, spy_bars=spy) for symbol, frame in bars.items()}
     rows: list[dict[str, object]] = []
     signal_families = {
@@ -60,7 +60,7 @@ def run(database_path=None) -> dict[str, object]:
         "atr_breakout_v1": breakout_signals,
     }
     for name, signal_function in signal_families.items():
-        for symbol in DEFAULT_UNIVERSE:
+        for symbol in universe:
             signals = signal_function(features[symbol])
             base = ETFBacktester(config=BacktestConfig.saxo_us_etf_eur()).run(bars[symbol], signals)
             stress = ETFBacktester(config=BacktestConfig.saxo_us_etf_eur(stress_multiplier=2)).run(bars[symbol], signals)

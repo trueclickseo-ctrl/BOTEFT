@@ -16,9 +16,20 @@ class WeightEngineConfig:
 
 
 def run_weight_backtest(prices: pd.DataFrame, target_weights: pd.DataFrame,
-                        config: WeightEngineConfig = WeightEngineConfig()):
+                        config: WeightEngineConfig = WeightEngineConfig(),
+                        cash_returns: pd.Series | None = None):
     prices, target_weights = prices.align(target_weights, join="inner", axis=0)
     target_weights = target_weights.reindex(columns=prices.columns, fill_value=0.0).fillna(0.0)
+    if (target_weights < -1e-12).any().any():
+        raise ValueError("Long-only target weights cannot be negative")
+    if (target_weights.sum(axis=1) > 1 + 1e-12).any():
+        raise ValueError("Target weights cannot exceed available capital")
+    if cash_returns is None:
+        cash_returns = pd.Series(0.0, index=prices.index)
+    else:
+        cash_returns = cash_returns.reindex(prices.index).ffill().fillna(0.0).astype(float)
+        if (cash_returns <= -1).any():
+            raise ValueError("Cash return cannot be less than or equal to -100 percent")
     returns = prices.pct_change(fill_method=None).fillna(0.0)
     equity, weights, curve, costs = config.initial_cash, pd.Series(0.0, index=prices.columns), [], []
     total_turnover, order_count = 0.0, 0
@@ -42,7 +53,8 @@ def run_weight_backtest(prices: pd.DataFrame, target_weights: pd.DataFrame,
             weights = desired.copy()
             previous_target = desired.copy()
         period_returns = returns.loc[date]
-        portfolio_return = float((weights * period_returns).sum())
+        cash_weight = max(1.0 - float(weights.sum()), 0.0)
+        portfolio_return = float((weights * period_returns).sum()) + cash_weight * float(cash_returns.loc[date])
         equity *= max(1 + portfolio_return, 0.0)
         if 1 + portfolio_return > 0:
             weights = weights * (1 + period_returns) / (1 + portfolio_return)

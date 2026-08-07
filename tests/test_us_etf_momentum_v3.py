@@ -38,3 +38,28 @@ def test_weight_engine_allows_weights_to_drift_without_rebalancing():
         commission_bps=0, minimum_commission=0, fx_and_slippage_bps=0))
     assert len(costs) == 1
     assert metrics["total_return"] > .10
+
+
+def test_weight_engine_accrues_supplied_cash_return_only_on_idle_cash():
+    dates = pd.bdate_range("2024-01-01", periods=3)
+    prices = pd.DataFrame({"A": [100., 100., 100.]}, index=dates)
+    weights = pd.DataFrame({"A": [.50, .50, .50]}, index=dates)
+    cash_returns = pd.Series([0., .01, .01], index=dates)
+    curve, _, _ = run_weight_backtest(
+        prices, weights,
+        WeightEngineConfig(commission_bps=0, minimum_commission=0, fx_and_slippage_bps=0),
+        cash_returns=cash_returns,
+    )
+    assert curve.iloc[-1] > 101_000
+    assert curve.iloc[-1] < 102_010
+
+
+def test_weight_engine_defaults_to_zero_cash_yield():
+    dates = pd.bdate_range("2024-01-01", periods=2)
+    prices = pd.DataFrame({"A": [100., 100.]}, index=dates)
+    weights = pd.DataFrame({"A": [0., 0.]}, index=dates)
+    curve, _, _ = run_weight_backtest(
+        prices, weights,
+        WeightEngineConfig(commission_bps=0, minimum_commission=0, fx_and_slippage_bps=0),
+    )
+    assert curve.iloc[-1] == 100_000

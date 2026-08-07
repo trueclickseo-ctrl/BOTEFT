@@ -20,3 +20,14 @@ BOTEF keeps research and execution data separate.
 - Universe: SPY, QQQ, IWM, DIA, XLK, XLF, XLE, XLV, XLI, XLY, XLP, TLT, GLD, SLV, IEF, TIP, PDBC, EFA, EEM, VNQ
 
 Yahoo data is suitable for research but is not the broker execution record and carries no service-level guarantee. A future paid total-return feed may replace it. Strategies must never mix Saxo price-only series and Yahoo adjusted series within one cross-sectional run.
+
+## Stock research data
+
+- Database: `data/stocks/us_adjusted.sqlite3`
+- Source: Yahoo Finance through `YahooFinanceProvider`
+- Purpose: isolated US-stock candidate discovery
+- Universe and workflows: `quant_ai_trader.workflows.stocks`
+- Research register: `STOCK_STRATEGY_RESEARCH.md`
+- Limitations: current-constituent survivorship bias, gross distribution adjustment, and no investor-specific dividend withholding
+
+Stock and ETF databases, universes, workflow entry points, and research registers must remain separate. The shared approval registry is only a fail-closed execution boundary.
