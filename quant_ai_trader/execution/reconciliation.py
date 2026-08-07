@@ -41,5 +41,6 @@ def quantities_from_saxo_positions(payload: dict) -> dict[str, int]:
         numeric = float(amount)
         if not numeric.is_integer():
             raise ValueError(f"Fractional Saxo position is unsupported for {symbol}")
-        quantities[symbol.upper()] = quantities.get(symbol.upper(), 0) + int(numeric)
+        normalized = symbol.split(":", 1)[0].upper()
+        quantities[normalized] = quantities.get(normalized, 0) + int(numeric)
     return quantities

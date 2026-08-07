@@ -21,6 +21,7 @@ STRATEGY = "stock_core_satellite_consolidated_v1"
 @dataclass(frozen=True)
 class StockDecision:
     action: str
+    raw_signal_action: str
     symbol: str | None
     reason: str
     signal_is_active: bool
@@ -72,16 +73,16 @@ def build_decision(*, database_path=STOCK_DATABASE,
     current_tactical_symbol = current_tactical_symbol.upper() if current_tactical_symbol else None
 
     if symbol is None:
-        action = "EXIT" if held else "CASH"
+        raw_action = "EXIT" if held else "CASH"
         reason = "No stock has positive 252-session momentum at the latest scheduled review."
     elif current_quantities.get(symbol, 0) > 0:
-        action = "HOLD"
+        raw_action = "HOLD"
         reason = f"{symbol} remains the strongest positive 252-session momentum stock."
     elif current_tactical_symbol and current_tactical_symbol != symbol:
-        action = "ROTATE"
+        raw_action = "ROTATE"
         reason = f"Rotate the tactical sleeve from {current_tactical_symbol} to {symbol}."
     else:
-        action = "BUY"
+        raw_action = "BUY"
         reason = f"{symbol} is the strongest positive 252-session momentum stock."
 
     signal_index = prices.index.get_loc(last_rebalance) - 1
@@ -107,14 +108,19 @@ def build_decision(*, database_path=STOCK_DATABASE,
         blockers.append(f"market data is stale: latest session is {prices.index[-1].date()}")
 
     next_review = (pd.Timestamp(last_rebalance) + pd.offsets.BDay(config.rebalance_days)).date()
+    submission_authorized = not blockers and approval.may_submit_paper_order
+    action = raw_action if submission_authorized or raw_action == "CASH" else (
+        "RISK_ALERT" if raw_action == "EXIT" else "CANDIDATE"
+    )
     return StockDecision(
-        action=action, symbol=symbol, reason=reason, signal_is_active=action in {"BUY", "HOLD", "ROTATE"},
+        action=action, raw_signal_action=raw_action, symbol=symbol, reason=reason,
+        signal_is_active=raw_action in {"BUY", "HOLD", "ROTATE"},
         target_weight=float(latest.get(symbol, 0.0)) if symbol else 0.0,
         signal_date=str(prices.index[signal_index].date()), last_rebalance_date=str(last_rebalance.date()),
         next_review_date=str(next_review), price=price, trailing_momentum=momentum,
         current_quantity=current_quantities.get(symbol, 0) if symbol else 0,
         indicative_target_quantity=quantity, strategy_status=str(approval.status),
-        submission_authorized=not blockers and approval.may_submit_paper_order,
+        submission_authorized=submission_authorized,
         blockers=tuple(blockers), target_weights={key: float(value) for key, value in latest.items() if value > 0},
         saxo_instrument=instrument,
     )

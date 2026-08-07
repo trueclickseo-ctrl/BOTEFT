@@ -16,6 +16,12 @@ def test_saxo_position_rows_are_aggregated_for_reconciliation():
     assert quantities_from_saxo_positions(payload) == {"SPY": 10}
 
 
+def test_saxo_exchange_suffix_is_removed_for_reconciliation():
+    payload = {"Data": [{"DisplayAndFormat": {"Symbol": "CAT:xnys"},
+                         "PositionBase": {"Amount": 3}}]}
+    assert quantities_from_saxo_positions(payload) == {"CAT": 3}
+
+
 def test_reconciliation_ignores_but_reports_positions_outside_botef_scope():
     result = reconcile_managed_positions(PortfolioManager(), {"AAPL": 5}, {"SPY", "SLV"})
     assert result.matched

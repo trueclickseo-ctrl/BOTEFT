@@ -73,8 +73,24 @@ momentum, signal/rebalance dates, whole-share target when account equity is
 provided, Saxo mapping state, and explicit submission blockers. It is exposed
 read-only at `/stocks/decision` and on the dashboard.
 
-On 2026-08-07 the operational output was `BUY CAT` at a 10% tactical
+On 2026-08-07 the raw strategy output was `BUY CAT` at a 10% tactical
 target. The signal used the 2026-07-15 close, rebalanced on 2026-07-16, and
 scheduled its next 21-business-session review for 2026-08-14. Saxo SIM
 read-only validation resolved `CAT:xnys` as Stock UIC 305. No precheck or order
 submission endpoint was called.
+
+The publication bug that exposed a raw ranking as an authorized `BUY` was
+removed. Unless every execution gate passes, the dashboard now displays
+`CANDIDATE CAT — NOT ACTIONABLE` and separately reports raw signal `BUY`.
+Read-only Saxo reconciliation normalizes exchange-suffixed symbols, compares
+only BOTEF's managed stock universe, reports external positions without taking
+ownership of them, and treats a missing local ledger as flat only when Saxo
+independently confirms there are no managed positions.
+
+The first live read-only reconciliation found pre-existing Saxo SIM positions
+in UNH and V plus five symbols outside BOTEF's stock universe. Because BOTEF did
+not create them, UNH and V were captured as an external quantity baseline
+rather than silently adopted. The subsequent reconciliation passed with no
+BOTEF-managed differences. The SIM kill switch was independently verified
+inactive. The local baseline lives under ignored runtime state and is not shared
+through Git.

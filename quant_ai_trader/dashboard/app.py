@@ -99,10 +99,12 @@ def _render_stock_decision() -> None:
         return
     action = decision["action"]
     symbol = decision["symbol"] or "CASH"
-    if action in {"BUY", "ROTATE"}:
+    if action in {"BUY", "ROTATE"} and decision["submission_authorized"]:
         st.success(f"{action} {symbol}")
     elif action == "HOLD":
         st.info(f"HOLD {symbol}")
+    elif action == "CANDIDATE":
+        st.warning(f"CANDIDATE {symbol} — NOT ACTIONABLE (raw signal: {decision['raw_signal_action']})")
     else:
         st.warning(action)
     columns = st.columns(4)
