@@ -28,3 +28,7 @@ class SaxoBroker:
     def net_positions(self, account_key: str) -> dict:
         response = self.session.get(f"{self.base_url}/port/v1/netpositions", params={"AccountKey": account_key, "$top": 100}, timeout=30)
         response.raise_for_status(); return response.json()
+    def accounts(self) -> dict:
+        """Read simulation accounts only; this endpoint has no trading side effect."""
+        response = self.session.get(f"{self.base_url}/port/v1/accounts/me", timeout=30)
+        response.raise_for_status(); return response.json()

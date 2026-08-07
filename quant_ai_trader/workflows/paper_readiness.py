@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 from quant_ai_trader.execution.readiness import assess_paper_readiness
 from quant_ai_trader.execution.reconciliation import ReconciliationResult
 from quant_ai_trader.execution.safety import TradingSafety
@@ -11,6 +13,7 @@ from quant_ai_trader.execution.safety import TradingSafety
 def run(operator_approved: bool = False, broker_positions_json: str = "{}") -> dict[str, object]:
     # Broker positions must be fetched and reconciled by the future Saxo portfolio
     # adapter; accepting no positions is not treated as a reconciliation approval.
+    load_dotenv(dotenv_path=Path(".env"))
     try:
         broker_positions = json.loads(broker_positions_json)
     except json.JSONDecodeError as error:

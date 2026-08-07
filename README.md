@@ -113,6 +113,24 @@ The controlled SLV paper-pilot planner is also non-submitting; it returns `NO_TR
 .\.venv\Scripts\python.exe -m quant_ai_trader.workflows.slv_paper_pilot
 ```
 
+The SLV pilot is confined to a separate SEK capital sleeve, initialized at 10,000 SEK. The rest of the Saxo account is never part of its sizing budget. Inspect the sleeve with:
+
+```powershell
+.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.capital_sleeve
+```
+
+For a single daily, non-submitting SLV pilot check (Saxo refresh, validation, plan, and audit log):
+
+```powershell
+.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.slv_paper_monitor
+```
+
+Discover your Saxo **simulation** account key without placing an order:
+
+```powershell
+.\.venv\Scripts\python.exe -m quant_ai_trader.workflows.saxo_account_lookup
+```
+
 ## Dashboard and API
 
 ```powershell

@@ -12,3 +12,8 @@ def test_upsert_and_load_bars(tmp_path, sample_bars):
     assert len(loaded) == 5
     assert loaded.iloc[0]["close"] == 999
     assert repository.latest_bar_date("SPY") == sample_bars.index[4]
+
+def test_capital_sleeve_preserves_only_its_own_equity(tmp_path):
+    repository=MarketDataRepository(tmp_path / "market.sqlite3"); repository.initialize()
+    assert repository.get_or_create_capital_sleeve("bot",10_000,"SEK")["current_capital"]==10_000
+    assert repository.mark_capital_sleeve("bot",11_000)["current_capital"]==11_000

@@ -41,6 +41,10 @@ class MarketDataRepository:
                 run_id TEXT PRIMARY KEY, strategy_name TEXT NOT NULL, symbol TEXT NOT NULL,
                 completed_at TEXT NOT NULL, metrics_json TEXT NOT NULL
             )""")
+            connection.execute("""CREATE TABLE IF NOT EXISTS capital_sleeves (
+                sleeve_name TEXT PRIMARY KEY, currency TEXT NOT NULL,
+                initial_capital REAL NOT NULL, current_capital REAL NOT NULL
+            )""")
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_daily_bars_symbol_date ON daily_bars(symbol, date)"
             )
@@ -93,6 +97,20 @@ class MarketDataRepository:
         with closing(self._connect()) as connection:
             row = connection.execute("SELECT MAX(date) FROM daily_bars WHERE symbol = ?", (symbol.upper(),)).fetchone()
         return pd.Timestamp(row[0]) if row and row[0] else None
+
+    def get_or_create_capital_sleeve(self, sleeve_name: str, initial_capital: float, currency: str = "SEK") -> dict[str, object]:
+        if initial_capital <= 0: raise ValueError("initial_capital must be positive")
+        with closing(self._connect()) as connection, connection:
+            connection.execute("INSERT OR IGNORE INTO capital_sleeves VALUES (?, ?, ?, ?)", (sleeve_name, currency.upper(), initial_capital, initial_capital))
+            row = connection.execute("SELECT sleeve_name, currency, initial_capital, current_capital FROM capital_sleeves WHERE sleeve_name = ?", (sleeve_name,)).fetchone()
+        return {"sleeve_name":row[0], "currency":row[1], "initial_capital":float(row[2]), "current_capital":float(row[3])}
+
+    def mark_capital_sleeve(self, sleeve_name: str, current_capital: float) -> dict[str, object]:
+        if current_capital < 0: raise ValueError("current_capital cannot be negative")
+        with closing(self._connect()) as connection, connection:
+            cursor = connection.execute("UPDATE capital_sleeves SET current_capital = ? WHERE sleeve_name = ?", (current_capital, sleeve_name))
+        if not cursor.rowcount: raise ValueError(f"Unknown capital sleeve: {sleeve_name}")
+        return self.get_or_create_capital_sleeve(sleeve_name, 1.0)
 
     def record_strategy_run(self, run_id: str, strategy_name: str, symbol: str, completed_at: str, metrics: dict[str, float]) -> None:
         with closing(self._connect()) as connection, connection:
