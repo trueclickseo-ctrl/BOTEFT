@@ -47,6 +47,26 @@ STRATEGY_APPROVALS: dict[str, StrategyApproval] = {
         "defensive_momentum_v2_weekly_vol_overlay", StrategyStatus.REJECTED,
         "Weekly thresholded resizing reduced exact-cost Sharpe to 0.51.",
     ),
+    "defensive_momentum_v2_tail_overlay": StrategyApproval(
+        "defensive_momentum_v2_tail_overlay", StrategyStatus.REJECTED,
+        "Tail transitions increased turnover and reduced exact-cost Sharpe to 0.52.",
+    ),
+    "relative_strength_skip_month_v1": StrategyApproval(
+        "relative_strength_skip_month_v1", StrategyStatus.REJECTED,
+        "Weekly ranking produced 0.14 Sharpe and failed doubled-cost stress.",
+    ),
+    "relative_strength_skip_month_tail_v1": StrategyApproval(
+        "relative_strength_skip_month_tail_v1", StrategyStatus.REJECTED,
+        "The combined variant had negative net return and failed four approval gates.",
+    ),
+    "us_etf_momentum_v3": StrategyApproval(
+        "us_etf_momentum_v3", StrategyStatus.REJECTED,
+        "Clean layered evaluation produced 0.48 Sharpe and -29.39% drawdown.",
+    ),
+    "us_etf_momentum_v3_tail": StrategyApproval(
+        "us_etf_momentum_v3_tail", StrategyStatus.REJECTED,
+        "Independent base-return tail overlay produced 0.46 Sharpe and -24.39% drawdown.",
+    ),
 }
 
 
